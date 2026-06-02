@@ -1,0 +1,6 @@
+[mcp_servers.pendragon]
+url = "http://WINDOWS_SERVER_IP:7573/mcp"
+bearer_token_env_var = "PENDRAGON_TOKEN"
+tool_timeout_sec = 120
+default_tools_approval_mode = "prompt"
+enabled = true

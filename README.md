@@ -44,6 +44,8 @@ npm run client -- exec Write-Output hello
 npm run client -- call-tool powershell_execute '{ "command": "Write-Output hello" }'
 ```
 
+For full Windows deployment steps and setup examples for Codex and Claude Code, see [Install Pendragon and Connect Agents](docs/INSTALL_AND_AGENT_USAGE.md).
+
 ## Configuration
 
 Environment variables:

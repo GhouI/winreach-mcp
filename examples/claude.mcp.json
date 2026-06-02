@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "pendragon": {
+      "type": "http",
+      "url": "http://WINDOWS_SERVER_IP:7573/mcp",
+      "headers": {
+        "Authorization": "Bearer ${PENDRAGON_TOKEN}"
+      }
+    }
+  }
+}
