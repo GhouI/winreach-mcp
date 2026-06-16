@@ -1,25 +1,26 @@
 import React from "react";
 import { AbsoluteFill, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
 
-const commands = [
-  {
-    at: 80,
-    text: "npm run client -- exec hostname",
-    result: "win-build-01"
-  },
-  {
-    at: 145,
-    text: "npm run client -- exec '$PSVersionTable.PSVersion'",
-    result: "Major  Minor  Patch\n5      1      26100"
-  },
-  {
-    at: 215,
-    text: "npm run client -- exec Get-Service W32Time",
-    result: "Status   Name     DisplayName\nRunning  W32Time  Windows Time"
-  }
+const TUNNEL_HOST = "swift-river-7s3d.trycloudflare.com";
+
+type Line =
+  | { at: number; kind: "prompt"; text: string }
+  | { at: number; kind: "output"; text: string; accent?: boolean };
+
+const lines: Line[] = [
+  { at: 70, kind: "prompt", text: "$env:WINBRIDGE_TOKEN = '<redacted>'" },
+  { at: 90, kind: "prompt", text: "$env:WINBRIDGE_TUNNEL = 'cloudflare'" },
+  { at: 108, kind: "prompt", text: "npm run dev" },
+  { at: 132, kind: "output", text: "WinBridge MCP listening at http://127.0.0.1:7573/mcp" },
+  { at: 150, kind: "output", text: `Cloudflare tunnel ready: https://${TUNNEL_HOST}`, accent: true },
+  { at: 168, kind: "output", text: `Public MCP endpoint: https://${TUNNEL_HOST}/mcp`, accent: true },
+  { at: 215, kind: "prompt", text: "npm run client -- exec hostname" },
+  { at: 233, kind: "output", text: "win-build-01" },
+  { at: 285, kind: "prompt", text: "npm run client -- --url win-1 --url win-2 exec hostname" },
+  { at: 303, kind: "output", text: "win-1: win-build-01    win-2: win-test-02" }
 ];
 
-export function PendragonDemo() {
+export function WinBridgeDemo() {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const glow = spring({ frame, fps, config: { damping: 18, stiffness: 60 } });
@@ -32,12 +33,12 @@ export function PendragonDemo() {
         <div style={styles.badge}>MCP for Windows PowerShell</div>
         <h1 style={styles.title}>AI agents can code. Windows RDP traps them behind a GUI.</h1>
         <p style={{ ...styles.subtitle, opacity: subtitleOpacity }}>
-          Pendragon turns Windows into an MCP-native shell target.
+          WinBridge turns Windows into an MCP-native shell target — and publishes it in one command.
         </p>
       </div>
       <NetworkDiagram frame={frame} />
       <Terminal frame={frame} />
-      <div style={styles.footer}>Codex / Claude Code / MCP clients {"->"} Pendragon {"->"} headless PowerShell</div>
+      <div style={styles.footer}>Agent {"->"} Cloudflare tunnel {"->"} WinBridge {"->"} headless PowerShell</div>
     </AbsoluteFill>
   );
 }
@@ -47,22 +48,38 @@ function NetworkDiagram({ frame }: { frame: number }) {
   return (
     <div style={styles.diagram}>
       <Node label="Agent" detail="Codex or Claude Code" active={frame > 35} />
-      <Line active={frame > 55} pulse={pulse} />
-      <Node label="Pendragon" detail="Streamable HTTP MCP" active={frame > 65} accent />
-      <Line active={frame > 95} pulse={pulse} />
-      <Node label="Windows" detail="PowerShell, headless" active={frame > 105} />
+      <Line active={frame > 52} pulse={pulse} />
+      <Node label="Tunnel" detail="*.trycloudflare.com" active={frame > 60} cloud />
+      <Line active={frame > 80} pulse={pulse} />
+      <Node label="WinBridge" detail="Streamable HTTP MCP" active={frame > 88} accent />
+      <Line active={frame > 110} pulse={pulse} />
+      <Node label="Windows" detail="PowerShell, headless" active={frame > 118} />
     </div>
   );
 }
 
-function Node({ label, detail, active, accent = false }: { label: string; detail: string; active: boolean; accent?: boolean }) {
+function Node({
+  label,
+  detail,
+  active,
+  accent = false,
+  cloud = false
+}: {
+  label: string;
+  detail: string;
+  active: boolean;
+  accent?: boolean;
+  cloud?: boolean;
+}) {
+  const border = accent ? "#e43f5a" : cloud ? "#f5a742" : "#5dd6c5";
+  const shadow = accent ? "rgba(228,63,90,.34)" : cloud ? "rgba(245,167,66,.30)" : "rgba(93,214,197,.24)";
   return (
     <div
       style={{
         ...styles.node,
-        opacity: active ? 1 : 0.35,
-        borderColor: accent ? "#e43f5a" : "#5dd6c5",
-        boxShadow: active ? `0 0 28px ${accent ? "rgba(228,63,90,.34)" : "rgba(93,214,197,.24)"}` : "none"
+        opacity: active ? 1 : 0.32,
+        borderColor: border,
+        boxShadow: active ? `0 0 28px ${shadow}` : "none"
       }}
     >
       <strong>{label}</strong>
@@ -80,37 +97,32 @@ function Line({ active, pulse }: { active: boolean; pulse: number }) {
 }
 
 function Terminal({ frame }: { frame: number }) {
-  const visible = commands.filter((command) => frame >= command.at);
+  const visible = lines.filter((line) => frame >= line.at);
   return (
     <div style={styles.terminal}>
       <div style={styles.terminalBar}>
         <span style={styles.dotRed} />
         <span style={styles.dotYellow} />
         <span style={styles.dotGreen} />
-        <span style={styles.terminalTitle}>Pendragon remote MCP demo</span>
+        <span style={styles.terminalTitle}>WinBridge — one command to publish a Windows host</span>
       </div>
       <div style={styles.terminalBody}>
-        <Prompt text="$env:PENDRAGON_URL = 'http://windows-host:7573/mcp'" show={frame > 45} />
-        <Prompt text="$env:PENDRAGON_TOKEN = '<redacted>'" show={frame > 55} />
-        {visible.map((command) => (
-          <div key={command.text}>
-            <Prompt text={command.text} show />
-            <pre style={styles.result}>{command.result}</pre>
-          </div>
-        ))}
-        {frame > 295 ? <div style={styles.success}>No screenshots. No RDP mouse control. Just MCP tools.</div> : null}
+        {visible.map((line) =>
+          line.kind === "prompt" ? (
+            <div key={line.text} style={styles.prompt}>
+              <span style={styles.promptMark}>PS&gt;</span>
+              <span>{line.text}</span>
+            </div>
+          ) : (
+            <pre key={line.text} style={{ ...styles.result, color: line.accent ? "#5dd67a" : "#e7edf8" }}>
+              {line.text}
+            </pre>
+          )
+        )}
+        {frame > 345 ? <div style={styles.success}>No screenshots. No RDP. Just MCP tools — reachable from anywhere.</div> : null}
       </div>
     </div>
   );
-}
-
-function Prompt({ text, show }: { text: string; show: boolean }) {
-  return show ? (
-    <div style={styles.prompt}>
-      <span style={styles.promptMark}>PS&gt;</span>
-      <span>{text}</span>
-    </div>
-  ) : null;
 }
 
 const styles: Record<string, React.CSSProperties> = {
@@ -131,7 +143,7 @@ const styles: Record<string, React.CSSProperties> = {
   hero: {
     position: "absolute",
     left: 64,
-    top: 54,
+    top: 50,
     width: 720
   },
   badge: {
@@ -142,45 +154,45 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 6,
     fontSize: 20,
     fontWeight: 700,
-    marginBottom: 20
+    marginBottom: 18
   },
   title: {
-    fontSize: 44,
+    fontSize: 42,
     lineHeight: 1.05,
     margin: 0,
     letterSpacing: 0,
     maxWidth: 720
   },
   subtitle: {
-    fontSize: 28,
+    fontSize: 26,
     lineHeight: 1.25,
     color: "#c6d0df",
-    marginTop: 20,
+    marginTop: 18,
     maxWidth: 760
   },
   diagram: {
     position: "absolute",
-    top: 298,
+    top: 286,
     left: 64,
     display: "flex",
     alignItems: "center",
-    gap: 18
+    gap: 12
   },
   node: {
-    width: 182,
-    minHeight: 76,
+    width: 168,
+    minHeight: 72,
     border: "2px solid #5dd6c5",
     borderRadius: 8,
-    padding: "18px 20px",
+    padding: "16px 18px",
     background: "rgba(20,24,34,.88)",
     display: "flex",
     flexDirection: "column",
-    gap: 7,
+    gap: 6,
     transition: "opacity .2s",
-    fontSize: 24
+    fontSize: 22
   },
   lineWrap: {
-    width: 70,
+    width: 48,
     height: 2,
     display: "flex",
     alignItems: "center"
@@ -194,8 +206,8 @@ const styles: Record<string, React.CSSProperties> = {
     position: "absolute",
     left: 64,
     right: 64,
-    bottom: 48,
-    height: 250,
+    bottom: 40,
+    height: 286,
     background: "rgba(6, 9, 13, .92)",
     border: "1px solid rgba(255,255,255,.16)",
     borderRadius: 8,
@@ -203,7 +215,7 @@ const styles: Record<string, React.CSSProperties> = {
     boxShadow: "0 24px 80px rgba(0,0,0,.42)"
   },
   terminalBar: {
-    height: 42,
+    height: 40,
     background: "#202633",
     display: "flex",
     alignItems: "center",
@@ -212,17 +224,17 @@ const styles: Record<string, React.CSSProperties> = {
   },
   terminalTitle: {
     color: "#9fb0c6",
-    fontSize: 17,
+    fontSize: 16,
     marginLeft: 10
   },
   dotRed: { width: 12, height: 12, borderRadius: 12, background: "#e43f5a" },
   dotYellow: { width: 12, height: 12, borderRadius: 12, background: "#f5c542" },
   dotGreen: { width: 12, height: 12, borderRadius: 12, background: "#5dd67a" },
   terminalBody: {
-    padding: "18px 22px",
+    padding: "16px 22px",
     fontFamily: "Cascadia Mono, Consolas, monospace",
-    fontSize: 21,
-    lineHeight: 1.42
+    fontSize: 19,
+    lineHeight: 1.36
   },
   prompt: {
     display: "flex",
@@ -233,23 +245,22 @@ const styles: Record<string, React.CSSProperties> = {
     color: "#5dd6c5"
   },
   result: {
-    margin: "4px 0 10px 44px",
-    color: "#e7edf8",
+    margin: "2px 0 8px 44px",
     font: "inherit",
     whiteSpace: "pre-wrap"
   },
   success: {
     color: "#5dd67a",
-    marginTop: 8,
+    marginTop: 6,
     fontWeight: 700
   },
   footer: {
     position: "absolute",
     right: 64,
-    top: 74,
-    width: 310,
+    top: 70,
+    width: 300,
     color: "#c6d0df",
-    fontSize: 25,
+    fontSize: 23,
     lineHeight: 1.28,
     textAlign: "right"
   }
