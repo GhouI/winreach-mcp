@@ -100,4 +100,33 @@ describe("resolveClientTargets", () => {
       }
     ]);
   });
+
+  it("prefers WINBRIDGE_ env vars", () => {
+    expect(
+      resolveClientTargets({
+        WINBRIDGE_TOKEN: "winbridge",
+        WINBRIDGE_URLS: "http://win-1:7573/mcp,http://win-2:7573/mcp"
+      })
+    ).toEqual([
+      { name: "target-1", url: "http://win-1:7573/mcp", token: "winbridge" },
+      { name: "target-2", url: "http://win-2:7573/mcp", token: "winbridge" }
+    ]);
+  });
+
+  it("lets WINBRIDGE_ override legacy PENDRAGON_ values", () => {
+    expect(
+      resolveClientTargets({
+        WINBRIDGE_TOKEN: "new",
+        PENDRAGON_TOKEN: "old",
+        WINBRIDGE_URL: "http://new:7573/mcp",
+        PENDRAGON_URL: "http://old:7573/mcp"
+      })
+    ).toEqual([
+      { name: "default", url: "http://new:7573/mcp", token: "new" }
+    ]);
+  });
+
+  it("requires a token", () => {
+    expect(() => resolveClientTargets({})).toThrow("WINBRIDGE_TOKEN is required");
+  });
 });

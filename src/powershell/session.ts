@@ -93,7 +93,7 @@ class PowerShellSession {
 
   private runCommand(options: ExecuteOptions, resolve: (result: PowerShellResult) => void): void {
     const commandId = randomUUID();
-    const marker = `__PENDRAGON_END_${commandId.replaceAll("-", "_")}__`;
+    const marker = `__WINBRIDGE_END_${commandId.replaceAll("-", "_")}__`;
     const timeoutMs = options.timeoutMs ?? this.runtime.defaultTimeoutMs;
     this.stdoutText = "";
     this.lastUsedAt = new Date();
@@ -214,21 +214,21 @@ export class PowerShellSessionManager {
 
 function formatSessionCommand(command: string, marker: string): string {
   return `
-$__pendragon_exit_code = 0
+$__winbridge_exit_code = 0
 try {
 ${command}
   if ($?) {
-    $__pendragon_exit_code = 0
+    $__winbridge_exit_code = 0
   } elseif ($LASTEXITCODE -is [int]) {
-    $__pendragon_exit_code = $LASTEXITCODE
+    $__winbridge_exit_code = $LASTEXITCODE
   } else {
-    $__pendragon_exit_code = 1
+    $__winbridge_exit_code = 1
   }
 } catch {
   Write-Error $_
-  $__pendragon_exit_code = 1
+  $__winbridge_exit_code = 1
 }
-[Console]::Out.WriteLine("${marker}:exit=$__pendragon_exit_code")
+[Console]::Out.WriteLine("${marker}:exit=$__winbridge_exit_code")
 `;
 }
 

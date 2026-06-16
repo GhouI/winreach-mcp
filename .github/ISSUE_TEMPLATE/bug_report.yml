@@ -1,5 +1,5 @@
 name: Bug report
-description: Report a reproducible problem with Pendragon MCP.
+description: Report a reproducible problem with WinBridge MCP.
 title: "[Bug]: "
 labels: ["bug"]
 body:

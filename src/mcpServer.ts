@@ -32,7 +32,7 @@ const closeInputSchema = {
   sessionId: z.string().min(1).describe("PowerShell session id")
 };
 
-export function createPendragonMcpServer(
+export function createWinBridgeMcpServer(
   config: AppConfig,
   sessions: PowerShellSessionManager
 ): McpServer {
@@ -41,10 +41,10 @@ export function createPendragonMcpServer(
     version: config.version
   }, {
     instructions: [
-      "Pendragon provides headless PowerShell access to the Windows host running this MCP server.",
+      "WinBridge provides headless PowerShell access to the Windows host running this MCP server.",
       "Use powershell_execute for isolated commands.",
       "Use powershell_open_session, powershell_send, and powershell_close_session when state must persist across commands, such as variables, imported modules, or working directory.",
-      "Commands run as the operating system user that launched Pendragon.",
+      "Commands run as the operating system user that launched WinBridge.",
       "Treat every tool call as remote command execution and avoid sending secrets unless the operator explicitly intends that."
     ].join(" ")
   });
@@ -101,7 +101,7 @@ export function createPendragonMcpServer(
   return server;
 }
 
-export function createPendragonApp(config: AppConfig) {
+export function createWinBridgeApp(config: AppConfig) {
   const sessions = new PowerShellSessionManager(config);
   const app = createMcpExpressApp({ host: config.host });
 
@@ -109,7 +109,7 @@ export function createPendragonApp(config: AppConfig) {
   app.use(config.endpointPath, createBearerAuthMiddleware(config.authToken));
 
   app.post(config.endpointPath, async (req: Request, res: Response) => {
-    const server = createPendragonMcpServer(config, sessions);
+    const server = createWinBridgeMcpServer(config, sessions);
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined
     });

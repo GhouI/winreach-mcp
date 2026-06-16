@@ -7,7 +7,7 @@ if (command === "-") {
   process.stdin.setEncoding("utf8");
   process.stdin.on("data", (chunk) => {
     const text = String(chunk);
-    const marker = text.match(/__PENDRAGON_END_[A-Za-z0-9_]+__/);
+    const marker = text.match(/__WINBRIDGE_END_[A-Za-z0-9_]+__/);
     if (text.includes("mock_set")) {
       process.stdout.write("mocked\n");
     }

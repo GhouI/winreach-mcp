@@ -1,10 +1,10 @@
 {
   "mcpServers": {
-    "pendragon": {
+    "winbridge": {
       "type": "http",
       "url": "http://WINDOWS_SERVER_IP:7573/mcp",
       "headers": {
-        "Authorization": "Bearer ${PENDRAGON_TOKEN}"
+        "Authorization": "Bearer ${WINBRIDGE_TOKEN}"
       }
     }
   }

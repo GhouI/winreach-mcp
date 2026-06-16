@@ -29,8 +29,8 @@ async function runTargetCommand(
   argParts: string[]
 ): Promise<unknown> {
   const client = new Client({
-    name: "pendragon-diagnostic-client",
-    version: "0.1.0"
+    name: "winbridge-diagnostic-client",
+    version: "0.2.0"
   });
 
   const transport = new StreamableHTTPClientTransport(new URL(target.url), {
@@ -125,8 +125,8 @@ function usageText(): string {
     "  npm run client -- call-tool powershell_execute '{\"command\":\"Write-Output hello\"}'",
     "",
     "Targets:",
-    "  PENDRAGON_URL=http://127.0.0.1:7573/mcp",
-    "  PENDRAGON_URLS=http://win-1:7573/mcp,http://win-2:7573/mcp",
+    "  WINBRIDGE_URL=http://127.0.0.1:7573/mcp",
+    "  WINBRIDGE_URLS=http://win-1:7573/mcp,http://win-2:7573/mcp",
     "  npm run client -- --url http://win-1:7573/mcp --url http://win-2:7573/mcp exec hostname"
   ].join("\n");
 }

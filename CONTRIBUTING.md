@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping improve Pendragon MCP.
+Thanks for helping improve WinBridge MCP.
 
 ## Good First Contributions
 
@@ -21,11 +21,11 @@ npm test
 Use the diagnostic client for local smoke tests:
 
 ```powershell
-$env:PENDRAGON_TOKEN = "dev-token"
+$env:WINBRIDGE_TOKEN = "dev-token"
 npm run dev
 
 # In another terminal
-$env:PENDRAGON_TOKEN = "dev-token"
+$env:WINBRIDGE_TOKEN = "dev-token"
 npm run client -- exec Write-Output hello
 ```
 
@@ -38,4 +38,4 @@ npm run client -- exec Write-Output hello
 
 ## Security
 
-Pendragon executes PowerShell remotely after authentication. If you find a security issue, do not open a public issue with exploit details. See [SECURITY.md](SECURITY.md).
+WinBridge executes PowerShell remotely after authentication. If you find a security issue, do not open a public issue with exploit details. See [SECURITY.md](SECURITY.md).
