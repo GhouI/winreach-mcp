@@ -34,6 +34,7 @@ function makeConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     principals: [createPrimaryPrincipal("admin-token", { allow: [], deny: [] })],
     globalPolicy: { allow: [], deny: compilePatterns(["Remove-Item", "Format-Volume"], "deny") },
     screenshot: { enabled: false, allowedRoles: [], dir: join(tmpdir(), "winbridge-shots-test"), retentionMs: 0 },
+    fileTransfer: { enabled: false, maxBytes: 50 * 1024 * 1024 },
     allowedOrigins: [],
     defaultCwd: process.cwd(),
     defaultTimeoutMs: 5000,
@@ -272,5 +273,40 @@ describe("take_screenshot gating", () => {
   it("does not register the tool when the principal's role is not permitted", async () => {
     const names = await listToolNames(makeConfig({ screenshot: screenshot(true, ["operator"]) }), admin());
     expect(names).not.toContain("take_screenshot");
+  });
+});
+
+describe("file transfer gating", () => {
+  async function listToolNames(config: AppConfig, principal: Principal): Promise<string[]> {
+    const sessions = new PowerShellSessionManager(config);
+    const audit = createAuditLogger(undefined);
+    const server = createWinBridgeMcpServer(config, sessions, principal, audit);
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: "test-client", version: "0.0.0" });
+    await Promise.all([client.connect(clientTransport), server.connect(serverTransport)]);
+    cleanups.push(() => {
+      sessions.closeAll();
+      void client.close();
+      void server.close();
+    });
+    const { tools } = await client.listTools();
+    return tools.map((tool) => tool.name);
+  }
+
+  const admin = () => createPrimaryPrincipal("admin-token", { allow: [], deny: [] });
+
+  it("does not register the tools when no root is configured", async () => {
+    const names = await listToolNames(makeConfig(), admin());
+    expect(names).not.toContain("file_upload");
+    expect(names).not.toContain("file_download");
+  });
+
+  it("registers both tools when a root is configured", async () => {
+    const config = makeConfig({
+      fileTransfer: { enabled: true, root: join(tmpdir(), "winbridge-files-test"), maxBytes: 1024 }
+    });
+    const names = await listToolNames(config, admin());
+    expect(names).toContain("file_upload");
+    expect(names).toContain("file_download");
   });
 });

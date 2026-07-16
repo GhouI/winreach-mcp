@@ -13,6 +13,7 @@ import { executePowerShell } from "./powershell/shell.js";
 import { captureScreenshot } from "./powershell/screenshot.js";
 import { PowerShellSessionManager } from "./powershell/session.js";
 import type { PowerShellResult, ScreenshotResult } from "./powershell/types.js";
+import { downloadFile, uploadFile, type FileDownloadResult } from "./fileTransfer.js";
 
 const commandInputSchema = {
   command: z.string().min(1).describe("PowerShell command to execute"),
@@ -129,6 +130,26 @@ function isScreenshotAllowed(config: AppConfig, principal: Principal): boolean {
   const roles = config.screenshot.allowedRoles;
   return roles.length === 0 || roles.includes(principal.role);
 }
+
+const fileUploadInputSchema = {
+  path: z
+    .string()
+    .min(1)
+    .describe("Destination path, relative to the configured file root (WINBRIDGE_FILE_ROOT)."),
+  content: z.string().describe("File content, base64-encoded."),
+  overwrite: z.boolean().optional().describe("Overwrite an existing file. Defaults to false.")
+};
+
+const fileDownloadInputSchema = {
+  path: z
+    .string()
+    .min(1)
+    .describe("Source path, relative to the configured file root (WINBRIDGE_FILE_ROOT)."),
+  deleteSource: z
+    .boolean()
+    .optional()
+    .describe("Delete the source after a successful read, turning the copy into a move. Defaults to false.")
+};
 
 export function createWinBridgeMcpServer(
   config: AppConfig,
@@ -284,6 +305,62 @@ export function createWinBridgeMcpServer(
     );
   }
 
+  // File transfer is only exposed when the operator has configured a sandbox
+  // root; every path is then confined to that root.
+  if (config.fileTransfer.enabled) {
+    const fileRuntime = { root: config.fileTransfer.root, maxBytes: config.fileTransfer.maxBytes };
+
+    server.registerTool(
+      "file_upload",
+      {
+        title: "Upload File",
+        description:
+          "Write a base64-encoded file to the Windows host, inside the configured file root. Refuses to overwrite unless overwrite is set. Use this to put files on the server.",
+        inputSchema: fileUploadInputSchema
+      },
+      async (args) => {
+        const result = uploadFile(fileRuntime, args);
+        await audit.log({
+          time: new Date().toISOString(),
+          principal: principal.name,
+          role: principal.role,
+          tool: "file_upload",
+          decision: "allowed",
+          path: result.path,
+          bytes: result.success ? result.bytes : undefined,
+          reason: result.success ? undefined : result.error
+        });
+        // Keep the server-side absolute path out of the client payload (audited).
+        const { path: _serverPath, ...payload } = result;
+        return jsonToolResult(payload, !result.success);
+      }
+    );
+
+    server.registerTool(
+      "file_download",
+      {
+        title: "Download File",
+        description:
+          "Read a file from the Windows host (inside the configured file root) and return it base64-encoded. Set deleteSource to move it (delete the server copy after a successful read).",
+        inputSchema: fileDownloadInputSchema
+      },
+      async (args) => {
+        const result = downloadFile(fileRuntime, args);
+        await audit.log({
+          time: new Date().toISOString(),
+          principal: principal.name,
+          role: principal.role,
+          tool: "file_download",
+          decision: "allowed",
+          path: result.path,
+          bytes: result.success ? result.bytes : undefined,
+          reason: result.success ? undefined : result.error
+        });
+        return fileDownloadToolResult(result);
+      }
+    );
+  }
+
   return server;
 }
 
@@ -359,15 +436,32 @@ export function createWinBridgeApp(config: AppConfig) {
   return { app, sessions, audit };
 }
 
-function jsonToolResult(value: unknown) {
+function jsonToolResult(value: unknown, isError = false) {
   return {
     content: [
       {
         type: "text" as const,
         text: JSON.stringify(value, null, 2)
       }
-    ]
+    ],
+    ...(isError ? { isError: true as const } : {})
   };
+}
+
+/**
+ * Format a file download. The server-side absolute path is stripped from the
+ * client-facing payload (it is kept in the audit log); the base64 content is the
+ * payload the caller needs, so it is returned.
+ */
+function fileDownloadToolResult(result: FileDownloadResult) {
+  if (!result.success) {
+    return jsonToolResult(
+      { commandId: result.commandId, success: false, error: result.error ?? "Download failed." },
+      true
+    );
+  }
+  const { path: _serverPath, ...payload } = result;
+  return jsonToolResult(payload);
 }
 
 function screenshotToolResult(result: ScreenshotResult) {

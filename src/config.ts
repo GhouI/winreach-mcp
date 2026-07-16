@@ -1,5 +1,5 @@
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import type { TunnelProvider } from "./tunnel.js";
 import type { TlsConfig } from "./tls.js";
 import { compilePatterns, type CommandPolicy } from "./policy.js";
@@ -33,6 +33,21 @@ export type ScreenshotConfig = {
   retentionMs: number;
 };
 
+/**
+ * Authorization for the file-transfer tools (`file_upload` / `file_download`).
+ * These read and write host files, bypassing the command policy, so they are
+ * only enabled when the operator configures a root directory. Every path is
+ * confined to that root, so a transfer can never touch files outside it.
+ */
+export type FileTransferConfig = {
+  /** True when a root is configured; the tools are only registered then. */
+  enabled: boolean;
+  /** Absolute sandbox root. All transfer paths resolve within it. */
+  root?: string;
+  /** Maximum bytes per transferred file, in either direction. */
+  maxBytes: number;
+};
+
 export type AppConfig = {
   name: string;
   version: string;
@@ -49,6 +64,8 @@ export type AppConfig = {
   tls?: TlsConfig;
   /** Screen-capture authorization. Disabled unless explicitly turned on. */
   screenshot: ScreenshotConfig;
+  /** File-transfer authorization. Disabled unless a root directory is set. */
+  fileTransfer: FileTransferConfig;
   allowedOrigins: string[];
   shellPath?: string;
   defaultCwd: string;
@@ -179,6 +196,18 @@ function loadScreenshotConfig(): ScreenshotConfig {
   };
 }
 
+const DEFAULT_MAX_FILE_BYTES = 50 * 1024 * 1024;
+
+function loadFileTransferConfig(): FileTransferConfig {
+  const rawRoot = readEnv("FILE_ROOT")?.trim();
+  const root = rawRoot ? resolve(rawRoot) : undefined;
+  return {
+    enabled: Boolean(root),
+    root,
+    maxBytes: readNumberEnv("MAX_FILE_BYTES", DEFAULT_MAX_FILE_BYTES)
+  };
+}
+
 function loadGlobalPolicy(): CommandPolicy {
   return {
     allow: compilePatterns(readPatternListEnv("COMMAND_ALLOWLIST"), "WINBRIDGE_COMMAND_ALLOWLIST"),
@@ -252,6 +281,7 @@ export function loadConfig(): AppConfig {
     auditLogPath: readEnv("AUDIT_LOG")?.trim() || undefined,
     tls: loadTlsConfig(),
     screenshot: loadScreenshotConfig(),
+    fileTransfer: loadFileTransferConfig(),
     allowedOrigins: readListEnv("ALLOWED_ORIGINS"),
     shellPath: readEnv("SHELL_PATH"),
     defaultCwd: readEnv("CWD") ?? process.cwd(),

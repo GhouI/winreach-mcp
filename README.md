@@ -40,7 +40,7 @@ Most coding agents are comfortable in terminals, but Windows RDP is a GUI-first 
 
 ## Tooling
 
-WinBridge exposes six MCP tools:
+WinBridge exposes up to eight MCP tools (the last three are opt-in):
 
 | Tool | Purpose |
 | --- | --- |
@@ -50,6 +50,8 @@ WinBridge exposes six MCP tools:
 | `powershell_close_session` | Close a persistent session. |
 | `powershell_list_sessions` | List active sessions. |
 | `take_screenshot` | Capture the current screen of the Windows host as an image. Off by default (see below). |
+| `file_upload` | Write a file to the host, inside the configured file root. Off by default (see below). |
+| `file_download` | Read a file from the host (optionally moving it) as base64. Off by default (see below). |
 
 Command results include:
 
@@ -94,6 +96,28 @@ exposed to that principal at all. Captures are written to a **server-owned**
 directory (`WINBRIDGE_SCREENSHOT_DIR`) — callers cannot choose the path — and are
 automatically deleted after `WINBRIDGE_SCREENSHOT_RETENTION_HOURS` (default `8`)
 so they do not accumulate on the host.
+
+### File transfer
+
+`file_upload` and `file_download` move files between the agent and the Windows
+host over MCP (base64-encoded, SHA-256 returned for integrity). They are **off by
+default** and only registered once you set a sandbox root:
+
+```powershell
+$env:WINBRIDGE_FILE_ROOT = "C:\winbridge-files"
+```
+
+- **Every path is relative to `WINBRIDGE_FILE_ROOT`.** Absolute paths, `..`
+  traversal, and symlinks that escape the root are rejected, so a transfer can
+  never touch files outside the sandbox. Setting the root is what enables the
+  tools.
+- `file_upload` refuses to overwrite unless `overwrite: true`, and creates
+  parent directories inside the root as needed.
+- `file_download` returns the file as base64; set `deleteSource: true` to **move**
+  it (the server copy is deleted after a successful read).
+- Files larger than `WINBRIDGE_MAX_FILE_BYTES` (default 50 MB) are rejected in
+  either direction.
+- Every transfer is written to the audit log (tool, principal, server path, size).
 
 ## Quickstart
 
@@ -248,6 +272,8 @@ WinBridge reads `WINBRIDGE_*` variables. The legacy `PENDRAGON_*` names are stil
 | `WINBRIDGE_SCREENSHOT_ROLES` | empty | Comma-separated principal roles allowed to capture. Empty means any authenticated principal (when enabled). |
 | `WINBRIDGE_SCREENSHOT_DIR` | temp subdir | Server-owned directory captures are written to. Callers cannot override it. |
 | `WINBRIDGE_SCREENSHOT_RETENTION_HOURS` | `8` | Captures older than this are deleted (on startup and before each capture). Set `0` to keep them indefinitely. |
+| `WINBRIDGE_FILE_ROOT` | empty | Sandbox root for `file_upload`/`file_download`. Setting it enables the tools; all transfer paths resolve within it. |
+| `WINBRIDGE_MAX_FILE_BYTES` | `52428800` | Maximum bytes per transferred file (both directions). Default 50 MB. |
 | `WINBRIDGE_URL` | `http://127.0.0.1:7573/mcp` | Diagnostic client URL for one WinBridge server. |
 | `WINBRIDGE_URLS` | empty | Diagnostic client comma-separated URLs for multiple servers using `WINBRIDGE_TOKEN`. |
 | `WINBRIDGE_TARGETS` | empty | Diagnostic client JSON array for named servers and per-target token env vars. |
