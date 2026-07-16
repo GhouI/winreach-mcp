@@ -1,12 +1,12 @@
 "use client";
 
-// Horizontal stage indicator for the setup wizard. Steps are freely
-// navigable; visited steps show a check, steps with active warnings get an
-// amber dot so problems stay visible from any stage.
+// Typographic stage rail for onboarding. Each stage is a segment with a thin
+// top rule and a two-digit mono numeral — no chips, no icons. Rules read as a
+// progress track: completed segments are inked, the active one is amber.
+// Stages remain freely navigable; stages with active warnings carry a small
+// orange marker (plus screen-reader text).
 
-import { CheckIcon } from "@/components/icons";
-
-export function Stepper({
+export function StageRail({
   steps,
   active,
   onSelect,
@@ -19,48 +19,49 @@ export function Stepper({
 }) {
   return (
     <nav aria-label="Setup stages">
-      <ol className="flex items-center gap-1 overflow-x-auto pb-1 code-scroll">
+      <ol className="grid grid-cols-3 gap-x-4 gap-y-5 sm:grid-cols-6">
         {steps.map((title, i) => {
           const isActive = i === active;
           const isDone = i < active;
           const hasFlag = flagged.includes(i);
           return (
-            <li key={title} className="flex shrink-0 items-center gap-1">
-              {i > 0 && <span aria-hidden className="h-px w-3 bg-border sm:w-4" />}
+            <li key={title} className="min-w-0">
               <button
                 type="button"
                 onClick={() => onSelect(i)}
                 aria-current={isActive ? "step" : undefined}
-                className={`group flex items-center gap-2 rounded-full py-1 pl-1 pr-2.5 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
-                  isActive ? "bg-accent/10" : "hover:bg-surface-muted"
+                className={`group w-full border-t-2 pt-2.5 text-left transition-colors ${
+                  isActive
+                    ? "border-accent"
+                    : isDone
+                      ? "border-foreground/60 hover:border-foreground"
+                      : "border-border hover:border-border-strong"
                 }`}
               >
-                <span className="relative">
-                  <span
-                    className={`flex size-6 items-center justify-center rounded-full text-[11px] font-semibold transition ${
-                      isActive
-                        ? "bg-accent text-accent-fg"
-                        : isDone
-                          ? "bg-accent/15 text-accent"
-                          : "border border-border-strong bg-surface text-muted"
-                    }`}
-                  >
-                    {isDone ? <CheckIcon className="size-3" /> : i + 1}
-                  </span>
-                  {hasFlag && (
-                    <span
-                      aria-hidden
-                      className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-amber-500 ring-2 ring-background"
-                    />
-                  )}
+                <span
+                  className={`block font-mono text-[11px] tabular-nums tracking-[0.08em] ${
+                    isActive ? "text-accent-text" : isDone ? "text-foreground" : "text-faint"
+                  }`}
+                >
+                  {String(i + 1).padStart(2, "0")}
                 </span>
                 <span
-                  className={`text-xs font-medium ${
-                    isActive ? "text-foreground" : "hidden text-muted group-hover:text-foreground sm:block"
+                  className={`mt-1 block truncate text-[13px] leading-snug ${
+                    isActive
+                      ? "font-medium text-foreground"
+                      : "text-muted group-hover:text-foreground"
                   }`}
                 >
                   {title}
-                  {hasFlag && <span className="sr-only"> (has warnings)</span>}
+                  {hasFlag && (
+                    <>
+                      <span
+                        aria-hidden
+                        className="ml-1.5 inline-block size-1.5 -translate-y-px rounded-full bg-warn align-middle"
+                      />
+                      <span className="sr-only"> — has warnings</span>
+                    </>
+                  )}
                 </span>
               </button>
             </li>

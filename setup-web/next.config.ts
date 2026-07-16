@@ -12,6 +12,15 @@ const nextConfig: NextConfig = {
   // Database drivers are loaded via dynamic import() in the store adapters and
   // must stay external (Node require) rather than being bundled.
   serverExternalPackages: ["pg", "mysql2", "mongodb"],
+  // Everything lives at "/" now. Old bookmarks to the removed admin/login
+  // pages land on the console instead of a 404. API routes are unaffected.
+  async redirects() {
+    return [
+      { source: "/login", destination: "/", permanent: false },
+      { source: "/admin", destination: "/", permanent: false },
+      { source: "/admin/:path*", destination: "/", permanent: false },
+    ];
+  },
 };
 
 export default nextConfig;

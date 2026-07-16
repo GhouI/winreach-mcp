@@ -13,15 +13,15 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "WinBridge MCP Setup",
+  title: "WinBridge MCP",
   description:
-    "Configure a WinBridge MCP server: enable tools, restrict access by IP, and generate env vars, firewall rules, and agent-connect snippets.",
+    "Configure and operate a WinBridge MCP server: enable tools, restrict access by IP, manage account keys, and generate env vars, firewall rules, and agent-connect snippets.",
 };
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#fafafa" },
-    { media: "(prefers-color-scheme: dark)", color: "#09090b" },
+    { media: "(prefers-color-scheme: light)", color: "#faf9f5" },
+    { media: "(prefers-color-scheme: dark)", color: "#121110" },
   ],
 };
 

@@ -1,7 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import Link from "next/link";
+// The whole app lives at "/".
+//
+//   First run   -> inline onboarding: six numbered stages that build the
+//                  server configuration, with accounts/auth at the end.
+//   Configured  -> the console (dashboard): Configuration, Accounts,
+//                  Agent access, and Database panels.
+//
+// Completion + the working configuration persist in localStorage; the config
+// itself round-trips through sanitizeConfig so stored JSON can never break
+// the editor. All server contracts (/api/*) are unchanged.
+
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   buildClaudeConfig,
   buildCodexConfig,
@@ -10,8 +20,7 @@ import {
   buildPrincipalsJson,
   buildStartScript,
   connectUrl,
-  generateToken,
-  parseList,
+  type WinBridgeConfig,
 } from "@/lib/winbridge-config";
 import {
   INITIAL,
@@ -20,36 +29,79 @@ import {
   toConfig,
   type FormState,
 } from "@/lib/form-state";
-import type { StoredConfig } from "@/lib/config-store";
-import { Field, Grid, Section, TextArea, TextInput, Toggle, Warn } from "@/components/ui";
-import { UsersEditor } from "@/components/users-editor";
+import { Section, Warn, btnPrimary, btnSecondary } from "@/components/ui";
 import { OutputPanel } from "@/components/output-panel";
-import { Stepper } from "@/components/stepper";
+import { StageRail } from "@/components/stepper";
 import {
-  ArrowLeftIcon,
-  ArrowRightIcon,
-  BotIcon,
-  ClipboardCheckIcon,
-  FilterIcon,
-  KeyIcon,
-  LockIcon,
-  ServerIcon,
-  ShieldIcon,
-  SlidersIcon,
-  SparklesIcon,
-  TerminalIcon,
-  UsersIcon,
-} from "@/components/icons";
+  AccessSection,
+  PolicySection,
+  SecuritySection,
+  ServerSection,
+  ToolsSection,
+  formWarnings,
+  type SetField,
+} from "@/components/config-sections";
+import { AccountsPanel, type Boot } from "@/components/accounts-panel";
+import { AgentAccessPanel } from "@/components/agent-access-panel";
+import { DatabasePanel } from "@/components/database-panel";
 
-const STEP_TITLES = ["Server", "Access", "Security", "Tools", "Policy", "Review"];
+const CONFIG_KEY = "winbridge.setup.v1";
+const ONBOARD_KEY = "winbridge.onboarded.v1";
+
+const STAGES = ["Server", "Security", "Tools", "Policy", "Access", "Review"];
+
+type Phase = "loading" | "onboarding" | "dashboard";
 
 export default function Home() {
+  const [phase, setPhase] = useState<Phase>("loading");
   const [form, setForm] = useState<FormState>(INITIAL);
-  const [step, setStep] = useState(0);
-  const set = <K extends keyof FormState>(key: K, value: FormState[K]) =>
-    setForm((f) => ({ ...f, [key]: value }));
+  const [boot, setBoot] = useState<Boot | null>(null);
 
+  const set: SetField = (key, value) => setForm((f) => ({ ...f, [key]: value }));
   const cfg = useMemo(() => toConfig(form), [form]);
+
+  // Hydrate the saved configuration + phase. localStorage is browser-only, so
+  // this must run after hydration; the microtask keeps the effect body free of
+  // synchronous setState (react-hooks/set-state-in-effect) while still
+  // resolving before the next paint in practice.
+  useEffect(() => {
+    queueMicrotask(() => {
+      try {
+        const raw = localStorage.getItem(CONFIG_KEY);
+        if (raw) setForm(fromConfig(sanitizeConfig(JSON.parse(raw))));
+      } catch {
+        /* corrupted store — start fresh */
+      }
+      let onboarded = false;
+      try {
+        onboarded = localStorage.getItem(ONBOARD_KEY) === "1";
+      } catch {
+        /* storage unavailable */
+      }
+      setPhase(onboarded ? "dashboard" : "onboarding");
+    });
+  }, []);
+
+  // Persist the working configuration as it changes.
+  useEffect(() => {
+    if (phase === "loading") return;
+    try {
+      localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
+    } catch {
+      /* storage unavailable */
+    }
+  }, [cfg, phase]);
+
+  // Account-store bootstrap state, needed by the console.
+  const refreshBoot = useCallback(() => {
+    fetch("/api/auth/session")
+      .then((r) => r.json())
+      .then((d) => setBoot(d as Boot))
+      .catch(() => setBoot(null));
+  }, []);
+  useEffect(() => {
+    if (phase === "dashboard") refreshBoot();
+  }, [phase, refreshBoot]);
 
   const tabs = useMemo(() => {
     const t: Record<string, string> = {};
@@ -62,21 +114,6 @@ export default function Home() {
     return t;
   }, [cfg]);
 
-  const tlsIncomplete =
-    (!!form.certPath.trim() || !!form.keyPath.trim()) &&
-    !(form.certPath.trim() && form.keyPath.trim());
-  const fileEnabledNoRoot = form.fileEnabled && !form.fileRoot.trim();
-  const exposedNoIps =
-    form.host.trim() === "0.0.0.0" && parseList(form.allowedIps).length === 0;
-
-  const usersNoneYet = form.authMode === "users" && form.users.length === 0;
-  const flaggedSteps = [
-    ...(exposedNoIps ? [0] : []),
-    ...(usersNoneYet ? [1] : []),
-    ...(tlsIncomplete ? [2] : []),
-    ...(fileEnabledNoRoot ? [3] : []),
-  ];
-
   const features = useMemo(() => {
     const list = ["powershell_*"];
     if (cfg.screenshot.enabled) list.push("take_screenshot");
@@ -87,439 +124,64 @@ export default function Home() {
     return list;
   }, [cfg]);
 
-  /* ---- Agent API sync (Review stage) ---- */
-  const [setupKey, setSetupKey] = useState("");
-  const [syncBusy, setSyncBusy] = useState(false);
-  const [sync, setSync] = useState<{ tone: "ok" | "err"; msg: string } | null>(null);
-
-  const callConfigApi = async (method: "GET" | "PUT") => {
-    setSyncBusy(true);
-    setSync(null);
+  const finishSetup = () => {
     try {
-      const res = await fetch("/api/config", {
-        method,
-        headers: {
-          authorization: `Bearer ${setupKey.trim()}`,
-          ...(method === "PUT"
-            ? { "content-type": "application/json", "x-updated-by": "web" }
-            : {}),
-        },
-        body: method === "PUT" ? JSON.stringify({ config: cfg }) : undefined,
-      });
-      const data = (await res.json().catch(() => null)) as
-        | (Partial<StoredConfig> & { error?: string })
-        | null;
-      if (!res.ok) {
-        setSync({ tone: "err", msg: data?.error ?? `Request failed (${res.status}).` });
-        return;
-      }
-      if (method === "GET") {
-        setForm(fromConfig(sanitizeConfig(data?.config)));
-        const when = data?.updatedAt ? new Date(data.updatedAt).toLocaleString() : "unknown time";
-        setSync({
-          tone: "ok",
-          msg: `Loaded the saved configuration (last updated ${when} by ${data?.updatedBy ?? "unknown"}).`,
-        });
-      } else {
-        setSync({
-          tone: "ok",
-          msg: "Configuration saved on this host. Agents with the setup key can now read and modify it.",
-        });
-      }
+      localStorage.setItem(ONBOARD_KEY, "1");
     } catch {
-      setSync({ tone: "err", msg: "Could not reach the setup API on this host." });
-    } finally {
-      setSyncBusy(false);
+      /* storage unavailable */
     }
+    setPhase("dashboard");
+  };
+
+  const restartSetup = () => {
+    try {
+      localStorage.removeItem(ONBOARD_KEY);
+    } catch {
+      /* storage unavailable */
+    }
+    setPhase("onboarding");
   };
 
   return (
-    <div className="relative flex min-h-full flex-col">
-      <div aria-hidden className="top-glow pointer-events-none absolute inset-x-0 top-0 h-80" />
-
+    <div className="flex min-h-full flex-col">
       {/* ---- Top bar ---- */}
-      <header className="sticky top-0 z-40 border-b border-border bg-background/85 backdrop-blur">
+      <header className="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur">
         <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between px-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-2.5">
-            <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-fg shadow-sm">
-              <TerminalIcon className="size-4" />
-            </span>
-            <span className="truncate text-sm font-semibold tracking-tight">WinBridge MCP</span>
-            <span aria-hidden className="text-faint">/</span>
-            <span className="text-sm text-muted">Setup</span>
-            <span className="ml-1 hidden rounded-full border border-border bg-surface px-2 py-0.5 text-[11px] font-medium text-muted sm:inline-block">
-              Config generator
-            </span>
+            <span aria-hidden className="size-2.5 shrink-0 bg-accent" />
+            <span className="truncate text-sm font-semibold tracking-tight">WinBridge</span>
+            <span className="text-sm text-faint">MCP</span>
           </div>
-          <div className="flex shrink-0 items-center gap-3 text-xs text-muted">
-            <Link
-              href="/admin"
-              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-2.5 py-1 font-medium transition hover:bg-surface-muted"
-            >
-              <UsersIcon className="size-3.5" />
-              Accounts
-            </Link>
-            <span className="hidden items-center gap-1.5 sm:flex">
-              <LockIcon className="size-3.5" />
-              Generated in your browser
-            </span>
-          </div>
+          <span className="eyebrow">
+            {phase === "dashboard" ? "Console" : phase === "onboarding" ? "Setup" : ""}
+          </span>
         </div>
       </header>
 
-      <main className="relative mx-auto w-full max-w-6xl flex-1 px-4 pb-16 pt-10 sm:px-6 lg:pt-14">
-        {/* ---- Hero ---- */}
-        <div className="mb-8 max-w-2xl lg:mb-10">
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-            Set up your WinBridge server
-          </h1>
-          <p className="mt-2.5 text-sm leading-relaxed text-muted">
-            Walk through the stages to configure the server, choose which tools are
-            exposed, and restrict access by IP. Output is generated locally as you
-            type — copy it, review it, and apply it on your Windows host.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(360px,440px)] lg:gap-8">
-          {/* ---- Wizard (left) ---- */}
-          <div className="min-w-0 space-y-5">
-            <Stepper
-              steps={STEP_TITLES}
-              active={step}
-              onSelect={setStep}
-              flagged={flaggedSteps}
-            />
-
-            {/* Stage 1 — Server */}
-            {step === 0 && (
-              <Section
-                icon={<ServerIcon className="size-4" />}
-                title="Server"
-                desc="Where WinBridge binds and its endpoint."
-              >
-                <Grid>
-                  <Field label="Bind host" hint="127.0.0.1 unless behind a firewall/tunnel">
-                    <TextInput value={form.host} onChange={(v) => set("host", v)} placeholder="127.0.0.1" mono />
-                  </Field>
-                  <Field label="Port">
-                    <TextInput value={form.port} onChange={(v) => set("port", v)} placeholder="7573" inputMode="numeric" mono />
-                  </Field>
-                  <Field label="Endpoint path">
-                    <TextInput value={form.endpointPath} onChange={(v) => set("endpointPath", v)} placeholder="/mcp" mono />
-                  </Field>
-                  <Field label="Cloudflare tunnel" hint="Publish over a quick tunnel" asDiv>
-                    <Toggle checked={form.tunnel} onChange={(v) => set("tunnel", v)} label="Enable tunnel" />
-                  </Field>
-                </Grid>
-                {exposedNoIps && (
-                  <Warn>
-                    Binding to 0.0.0.0 with no allowed IPs exposes the port to everyone.
-                    Add corporate IP ranges in the Access stage or use a tunnel.
-                  </Warn>
-                )}
-              </Section>
-            )}
-
-            {/* Stage 2 — Access */}
-            {step === 1 && (
-              <Section
-                icon={<KeyIcon className="size-4" />}
-                title="Authentication & access"
-                desc="How agents authenticate, and who may reach the server."
-              >
-                <Field label="Auth model" asDiv>
-                  <div className="flex flex-wrap gap-2">
-                    <ModeButton
-                      active={form.authMode === "single"}
-                      onClick={() => set("authMode", "single")}
-                      title="Single admin token"
-                      desc="One shared WINBRIDGE_TOKEN"
-                    />
-                    <ModeButton
-                      active={form.authMode === "users"}
-                      onClick={() => set("authMode", "users")}
-                      title="Multiple users"
-                      desc="Per-user keys, roles & tools"
-                    />
-                  </div>
-                </Field>
-
-                {form.authMode === "single" ? (
-                  <Field label="Bearer token (WINBRIDGE_TOKEN)" hint="Required. Use a long random value.">
-                    <div className="flex gap-2">
-                      <TextInput value={form.token} onChange={(v) => set("token", v)} placeholder="click Generate" mono />
-                      <button
-                        type="button"
-                        onClick={() => set("token", generateToken())}
-                        className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-accent px-3.5 text-sm font-medium text-accent-fg shadow-sm transition hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
-                      >
-                        <SparklesIcon className="size-3.5" />
-                        Generate
-                      </button>
-                    </div>
-                  </Field>
-                ) : (
-                  <Field
-                    label="Users"
-                    hint="Each user becomes a WINBRIDGE_PRINCIPALS entry with its own key, role, and tool/command limits."
-                    asDiv
-                  >
-                    <UsersEditor users={form.users} onChange={(users) => set("users", users)} />
-                  </Field>
-                )}
-
-                <Field
-                  label="Allowed source IPs / CIDRs"
-                  hint="Corporate ranges, comma or newline separated. Used for the firewall rule."
-                >
-                  <TextArea value={form.allowedIps} onChange={(v) => set("allowedIps", v)} placeholder={"10.0.0.0/8\n203.0.113.5"} />
-                </Field>
-                <Field label="Allowed Origins" hint="Optional. Restricts the Origin header (browser clients).">
-                  <TextInput value={form.allowedOrigins} onChange={(v) => set("allowedOrigins", v)} placeholder="https://app.example.com" mono />
-                </Field>
-              </Section>
-            )}
-
-            {/* Stage 3 — Security (TLS / mTLS) */}
-            {step === 2 && (
-              <Section
-                icon={<ShieldIcon className="size-4" />}
-                title="TLS / mTLS"
-                desc="Serve HTTPS in-app (optional). mTLS also requires a client CA."
-              >
-                <Grid>
-                  <Field label="TLS cert path">
-                    <TextInput value={form.certPath} onChange={(v) => set("certPath", v)} placeholder="C:\certs\server-cert.pem" mono />
-                  </Field>
-                  <Field label="TLS key path">
-                    <TextInput value={form.keyPath} onChange={(v) => set("keyPath", v)} placeholder="C:\certs\server-key.pem" mono />
-                  </Field>
-                  <Field label="Client CA (mTLS)" hint="Requires cert + key">
-                    <TextInput value={form.clientCaPath} onChange={(v) => set("clientCaPath", v)} placeholder="C:\certs\client-ca.pem" mono />
-                  </Field>
-                </Grid>
-                {tlsIncomplete && <Warn>TLS needs both a cert and a key. Set both, or clear them.</Warn>}
-              </Section>
-            )}
-
-            {/* Stage 4 — Tools */}
-            {step === 3 && (
-              <Section
-                icon={<SlidersIcon className="size-4" />}
-                title="Tools"
-                desc="powershell_* tools are always on. These extra tools are opt-in."
-              >
-                <div className="rounded-xl border border-border bg-background/60 p-4">
-                  <Toggle
-                    checked={form.screenshotEnabled}
-                    onChange={(v) => set("screenshotEnabled", v)}
-                    label="take_screenshot"
-                    description="Capture the interactive desktop and return it to the agent."
-                  />
-                  {form.screenshotEnabled && (
-                    <div className="mt-4 grid grid-cols-1 gap-x-4 gap-y-5 border-t border-border pt-4 sm:grid-cols-2">
-                      <Field label="Allowed roles" hint="Blank = any principal">
-                        <TextInput value={form.screenshotRoles} onChange={(v) => set("screenshotRoles", v)} placeholder="admin, operator" />
-                      </Field>
-                      <Field label="Retention (hours)" hint="0 = keep forever">
-                        <TextInput value={form.retentionHours} onChange={(v) => set("retentionHours", v)} inputMode="numeric" placeholder="8" mono />
-                      </Field>
-                    </div>
-                  )}
-                </div>
-
-                <div className="rounded-xl border border-border bg-background/60 p-4">
-                  <Toggle
-                    checked={form.fileEnabled}
-                    onChange={(v) => set("fileEnabled", v)}
-                    label="file_upload / file_download"
-                    description="Transfer files inside a sandboxed root directory."
-                  />
-                  {form.fileEnabled && (
-                    <div className="mt-4 grid grid-cols-1 gap-x-4 gap-y-5 border-t border-border pt-4 sm:grid-cols-2">
-                      <Field label="File root (sandbox)" hint="Required. All transfers stay inside this dir.">
-                        <TextInput value={form.fileRoot} onChange={(v) => set("fileRoot", v)} placeholder="C:\winbridge-files" mono />
-                      </Field>
-                      <Field label="Max file size (MB)">
-                        <TextInput value={form.maxBytesMB} onChange={(v) => set("maxBytesMB", v)} inputMode="numeric" placeholder="75" mono />
-                      </Field>
-                    </div>
-                  )}
-                  {fileEnabledNoRoot && (
-                    <div className="mt-3">
-                      <Warn>File transfer needs a root directory, or the tools stay disabled.</Warn>
-                    </div>
-                  )}
-                </div>
-              </Section>
-            )}
-
-            {/* Stage 5 — Policy */}
-            {step === 4 && (
-              <Section
-                icon={<FilterIcon className="size-4" />}
-                title="Command policy"
-                desc="Regex allow/deny for powershell_execute & sessions. Deny wins."
-              >
-                <Grid>
-                  <Field label="Allowlist" hint="Blank = allow all (subject to deny)">
-                    <TextArea value={form.allow} onChange={(v) => set("allow", v)} placeholder={"^Get-\n^Test-"} rows={4} />
-                  </Field>
-                  <Field label="Denylist">
-                    <TextArea value={form.deny} onChange={(v) => set("deny", v)} placeholder={"Remove-Item\nFormat-Volume"} rows={4} />
-                  </Field>
-                </Grid>
-              </Section>
-            )}
-
-            {/* Stage 6 — Review */}
-            {step === 5 && (
-              <>
-                <Section
-                  icon={<ClipboardCheckIcon className="size-4" />}
-                  title="Review"
-                  desc="A summary of everything this configuration enables."
-                >
-                  <dl className="grid grid-cols-1 gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
-                    <SummaryRow label="Connect URL" value={connectUrl(cfg)} mono wide />
-                    <SummaryRow label="Bind" value={`${cfg.host}:${cfg.port}`} mono />
-                    <SummaryRow label="Endpoint path" value={cfg.endpointPath} mono />
-                    <SummaryRow
-                      label="Transport"
-                      value={
-                        cfg.tls.certPath && cfg.tls.keyPath
-                          ? cfg.tls.clientCaPath
-                            ? "HTTPS + mTLS"
-                            : "HTTPS (TLS)"
-                          : "HTTP"
-                      }
-                    />
-                    <SummaryRow label="Cloudflare tunnel" value={cfg.tunnel ? "Enabled" : "Off"} />
-                    <SummaryRow
-                      label="Access model"
-                      value={
-                        cfg.authMode === "users"
-                          ? `${cfg.users.length} user${cfg.users.length === 1 ? "" : "s"} (per-user keys)`
-                          : form.token.trim()
-                            ? `Single token (${form.token.trim().length} chars)`
-                            : "Single token — not set"
-                      }
-                    />
-                    <SummaryRow
-                      label="Firewall scope"
-                      value={
-                        cfg.allowedIps.length > 0
-                          ? `${cfg.allowedIps.length} allowed ${cfg.allowedIps.length === 1 ? "range" : "ranges"}`
-                          : "Any (unrestricted)"
-                      }
-                    />
-                    <SummaryRow label="Tools" value={features.filter((f) => !["TLS", "mTLS", "tunnel"].includes(f)).join(", ")} mono wide />
-                    <SummaryRow
-                      label="Command policy"
-                      value={`${cfg.policy.allow.length} allow / ${cfg.policy.deny.length} deny rules`}
-                    />
-                  </dl>
-
-                  {(exposedNoIps || tlsIncomplete || fileEnabledNoRoot) && (
-                    <div className="space-y-2">
-                      {exposedNoIps && (
-                        <Warn>Binding to 0.0.0.0 with no allowed IPs exposes the port to everyone.</Warn>
-                      )}
-                      {tlsIncomplete && <Warn>TLS needs both a cert and a key. Set both, or clear them.</Warn>}
-                      {fileEnabledNoRoot && (
-                        <Warn>File transfer needs a root directory, or the tools stay disabled.</Warn>
-                      )}
-                    </div>
-                  )}
-                </Section>
-
-                <Section
-                  icon={<BotIcon className="size-4" />}
-                  title="Agent access"
-                  desc="Save this configuration on the host so agents holding the setup key can read and modify it over HTTP."
-                >
-                  <div className="overflow-x-auto rounded-lg border border-border bg-background/60 p-3 font-mono text-xs leading-6 text-muted code-scroll">
-                    <p><span className="text-accent">GET</span>&nbsp;&nbsp;/api/config</p>
-                    <p><span className="text-accent">PUT</span>&nbsp;&nbsp;/api/config</p>
-                    <p>Authorization: Bearer &lt;WINBRIDGE_SETUP_KEY&gt;</p>
-                  </div>
-                  <p className="text-xs leading-relaxed text-muted">
-                    The endpoint stays disabled until the <code className="font-mono">WINBRIDGE_SETUP_KEY</code>{" "}
-                    environment variable is set on the host running this app. Enter the same
-                    key below to save or load the shared configuration.
-                  </p>
-                  <Field label="Setup key" hint="Must match WINBRIDGE_SETUP_KEY on this host.">
-                    <TextInput value={setupKey} onChange={setSetupKey} placeholder="paste your setup key" mono />
-                  </Field>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      disabled={syncBusy || !setupKey.trim()}
-                      onClick={() => callConfigApi("PUT")}
-                      className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-accent px-4 text-sm font-medium text-accent-fg shadow-sm transition hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-surface disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      Save to host
-                    </button>
-                    <button
-                      type="button"
-                      disabled={syncBusy || !setupKey.trim()}
-                      onClick={() => callConfigApi("GET")}
-                      className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-surface px-4 text-sm font-medium transition hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      Load saved config
-                    </button>
-                    {syncBusy && <span className="text-xs text-muted">Working…</span>}
-                  </div>
-                  {sync && (
-                    <p
-                      role="status"
-                      className={`text-xs leading-relaxed ${
-                        sync.tone === "ok"
-                          ? "text-emerald-700 dark:text-emerald-400"
-                          : "text-red-600 dark:text-red-400"
-                      }`}
-                    >
-                      {sync.msg}
-                    </p>
-                  )}
-                </Section>
-              </>
-            )}
-
-            {/* ---- Stage navigation ---- */}
-            <div className="flex items-center justify-between gap-3">
-              <button
-                type="button"
-                onClick={() => setStep((s) => Math.max(0, s - 1))}
-                disabled={step === 0}
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-surface px-3.5 text-sm font-medium transition hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                <ArrowLeftIcon className="size-3.5" />
-                Back
-              </button>
-              <span className="text-xs tabular-nums text-faint">
-                Stage {step + 1} of {STEP_TITLES.length}
-              </span>
-              {step < STEP_TITLES.length - 1 ? (
-                <button
-                  type="button"
-                  onClick={() => setStep((s) => Math.min(STEP_TITLES.length - 1, s + 1))}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-accent px-4 text-sm font-medium text-accent-fg shadow-sm transition hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                >
-                  Continue
-                  <ArrowRightIcon className="size-3.5" />
-                </button>
-              ) : (
-                <span aria-hidden className="w-[88px]" />
-              )}
-            </div>
-          </div>
-
-          {/* ---- Live output (right) ---- */}
-          <div className="min-w-0 lg:sticky lg:top-[4.5rem] lg:h-fit">
-            <OutputPanel tabs={tabs} connect={connectUrl(cfg)} features={features} />
-          </div>
-        </div>
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 pb-20 pt-10 sm:px-6 lg:pt-12">
+        {phase === "onboarding" && (
+          <Onboarding
+            form={form}
+            set={set}
+            cfg={cfg}
+            tabs={tabs}
+            features={features}
+            onFinish={finishSetup}
+          />
+        )}
+        {phase === "dashboard" && (
+          <Dashboard
+            form={form}
+            set={set}
+            setForm={setForm}
+            cfg={cfg}
+            tabs={tabs}
+            features={features}
+            boot={boot}
+            refreshBoot={refreshBoot}
+            onRestart={restartSetup}
+          />
+        )}
       </main>
 
       {/* ---- Footer ---- */}
@@ -541,37 +203,182 @@ export default function Home() {
   );
 }
 
-/* ----------------------------- Auth mode button --------------------------- */
+/* ============================== Onboarding =============================== */
 
-function ModeButton({
-  active,
-  onClick,
-  title,
-  desc,
+function Onboarding({
+  form,
+  set,
+  cfg,
+  tabs,
+  features,
+  onFinish,
 }: {
-  active: boolean;
-  onClick: () => void;
-  title: string;
-  desc: string;
+  form: FormState;
+  set: SetField;
+  cfg: WinBridgeConfig;
+  tabs: Record<string, string>;
+  features: string[];
+  onFinish: () => void;
 }) {
+  const [step, setStep] = useState(0);
+  const w = formWarnings(form);
+  const flagged = [
+    ...(w.exposedNoIps ? [0] : []),
+    ...(w.tlsIncomplete ? [1] : []),
+    ...(w.fileEnabledNoRoot ? [2] : []),
+    ...(w.usersNoneYet || w.tokenMissing ? [4] : []),
+  ];
+  const last = STAGES.length - 1;
+
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={`min-w-[170px] flex-1 rounded-xl border px-4 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
-        active
-          ? "border-accent bg-accent/8 shadow-xs"
-          : "border-border bg-surface hover:bg-surface-muted"
-      }`}
-    >
-      <span className="block text-sm font-medium">{title}</span>
-      <span className="mt-0.5 block text-xs text-muted">{desc}</span>
-    </button>
+    <>
+      {/* ---- Hero ---- */}
+      <div className="mb-10 max-w-2xl">
+        <p className="eyebrow mb-3">Initial setup</p>
+        <h1 className="text-[28px] font-semibold leading-tight tracking-tight sm:text-[32px]">
+          Configure your WinBridge server
+        </h1>
+        <p className="mt-3 max-w-prose text-sm leading-relaxed text-muted">
+          Six stages: bind the server, secure it, choose which tools are exposed, set
+          the command policy, and define how agents authenticate. Output is generated
+          locally as you type — nothing leaves your browser until you say so.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(360px,440px)]">
+        {/* ---- Stages (left) ---- */}
+        <div className="min-w-0 space-y-6">
+          <StageRail steps={STAGES} active={step} onSelect={setStep} flagged={flagged} />
+
+          {step === 0 && <ServerSection form={form} set={set} eyebrow="Stage 01" />}
+          {step === 1 && <SecuritySection form={form} set={set} eyebrow="Stage 02" />}
+          {step === 2 && <ToolsSection form={form} set={set} eyebrow="Stage 03" />}
+          {step === 3 && <PolicySection form={form} set={set} eyebrow="Stage 04" />}
+          {step === 4 && <AccessSection form={form} set={set} eyebrow="Stage 05" />}
+          {step === 5 && <ReviewSection form={form} cfg={cfg} features={features} />}
+
+          {/* ---- Stage navigation ---- */}
+          <div className="flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={() => setStep((s) => Math.max(0, s - 1))}
+              disabled={step === 0}
+              className={btnSecondary}
+            >
+              Back
+            </button>
+            <span className="font-mono text-[11px] tabular-nums tracking-[0.08em] text-faint">
+              {String(step + 1).padStart(2, "0")} / {String(STAGES.length).padStart(2, "0")}
+            </span>
+            {step < last ? (
+              <button
+                type="button"
+                onClick={() => setStep((s) => Math.min(last, s + 1))}
+                className={btnPrimary}
+              >
+                Continue
+              </button>
+            ) : (
+              <button type="button" onClick={onFinish} className={btnPrimary}>
+                Finish setup
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* ---- Live output (right) ---- */}
+        <div className="min-w-0 lg:sticky lg:top-[4.5rem] lg:h-fit">
+          <OutputPanel tabs={tabs} connect={connectUrl(cfg)} features={features} />
+        </div>
+      </div>
+    </>
   );
 }
 
-/* ------------------------------ Review rows ------------------------------ */
+/* ------------------------------- Review ---------------------------------- */
+
+function ReviewSection({
+  form,
+  cfg,
+  features,
+}: {
+  form: FormState;
+  cfg: WinBridgeConfig;
+  features: string[];
+}) {
+  const w = formWarnings(form);
+  return (
+    <Section
+      eyebrow="Stage 06"
+      title="Review"
+      desc="A summary of everything this configuration enables."
+    >
+      <dl className="grid grid-cols-1 gap-x-6 gap-y-4 text-sm sm:grid-cols-2">
+        <SummaryRow label="Connect URL" value={connectUrl(cfg)} mono wide />
+        <SummaryRow label="Bind" value={`${cfg.host}:${cfg.port}`} mono />
+        <SummaryRow label="Endpoint path" value={cfg.endpointPath} mono />
+        <SummaryRow
+          label="Transport"
+          value={
+            cfg.tls.certPath && cfg.tls.keyPath
+              ? cfg.tls.clientCaPath
+                ? "HTTPS + mTLS"
+                : "HTTPS (TLS)"
+              : "HTTP"
+          }
+        />
+        <SummaryRow label="Cloudflare tunnel" value={cfg.tunnel ? "Enabled" : "Off"} />
+        <SummaryRow
+          label="Access model"
+          value={
+            cfg.authMode === "users"
+              ? `${cfg.users.length} user${cfg.users.length === 1 ? "" : "s"} (per-user keys)`
+              : form.token.trim()
+                ? `Single token (${form.token.trim().length} chars)`
+                : "Single token — not set"
+          }
+        />
+        <SummaryRow
+          label="Firewall scope"
+          value={
+            cfg.allowedIps.length > 0
+              ? `${cfg.allowedIps.length} allowed ${cfg.allowedIps.length === 1 ? "range" : "ranges"}`
+              : "Any (unrestricted)"
+          }
+        />
+        <SummaryRow
+          label="Tools"
+          value={features.filter((f) => !["TLS", "mTLS", "tunnel"].includes(f)).join(", ")}
+          mono
+          wide
+        />
+        <SummaryRow
+          label="Command policy"
+          value={`${cfg.policy.allow.length} allow / ${cfg.policy.deny.length} deny rules`}
+        />
+      </dl>
+
+      {(w.exposedNoIps || w.tlsIncomplete || w.fileEnabledNoRoot || w.usersNoneYet || w.tokenMissing) && (
+        <div className="space-y-2">
+          {w.exposedNoIps && (
+            <Warn>Binding to 0.0.0.0 with no allowed IPs exposes the port to everyone.</Warn>
+          )}
+          {w.tlsIncomplete && <Warn>TLS needs both a cert and a key. Set both, or clear them.</Warn>}
+          {w.fileEnabledNoRoot && (
+            <Warn>File transfer needs a root directory, or the tools stay disabled.</Warn>
+          )}
+          {w.usersNoneYet && <Warn>Multi-user mode has no users yet. Add at least one in Access.</Warn>}
+          {w.tokenMissing && <Warn>No bearer token set. Generate one in Access.</Warn>}
+        </div>
+      )}
+
+      <p className="border-t border-border pt-4 text-xs leading-relaxed text-muted">
+        After finishing, the console opens on this page: edit any of this configuration,
+        manage database-backed accounts, and save the config to this host for agents.
+      </p>
+    </Section>
+  );
+}
 
 function SummaryRow({
   label,
@@ -589,5 +396,146 @@ function SummaryRow({
       <dt className="text-xs text-muted">{label}</dt>
       <dd className={`mt-0.5 break-all text-[13px] ${mono ? "font-mono" : ""}`}>{value}</dd>
     </div>
+  );
+}
+
+/* =============================== Dashboard =============================== */
+
+type View = "config" | "accounts" | "agent" | "database";
+
+const VIEWS: { id: View; label: string }[] = [
+  { id: "config", label: "Configuration" },
+  { id: "accounts", label: "Accounts" },
+  { id: "agent", label: "Agent access" },
+  { id: "database", label: "Database" },
+];
+
+function Dashboard({
+  form,
+  set,
+  setForm,
+  cfg,
+  tabs,
+  features,
+  boot,
+  refreshBoot,
+  onRestart,
+}: {
+  form: FormState;
+  set: SetField;
+  setForm: (f: FormState) => void;
+  cfg: WinBridgeConfig;
+  tabs: Record<string, string>;
+  features: string[];
+  boot: Boot | null;
+  refreshBoot: () => void;
+  onRestart: () => void;
+}) {
+  const [view, setView] = useState<View>("config");
+
+  const transport =
+    cfg.tls.certPath && cfg.tls.keyPath
+      ? cfg.tls.clientCaPath
+        ? "HTTPS + mTLS"
+        : "HTTPS"
+      : "HTTP";
+  const access =
+    cfg.authMode === "users"
+      ? `${cfg.users.length} user${cfg.users.length === 1 ? "" : "s"}`
+      : "single token";
+
+  return (
+    <>
+      {/* ---- Masthead ---- */}
+      <div className="mb-8 flex flex-wrap items-end justify-between gap-x-6 gap-y-4">
+        <div className="min-w-0">
+          <p className="eyebrow mb-3">Console</p>
+          <h1 className="text-[28px] font-semibold leading-tight tracking-tight sm:text-[32px]">
+            WinBridge server
+          </h1>
+          <p className="mt-2.5 break-all font-mono text-[12.5px] leading-relaxed text-muted">
+            {connectUrl(cfg)}
+            <span className="mx-2 text-faint" aria-hidden>·</span>
+            {transport}
+            <span className="mx-2 text-faint" aria-hidden>·</span>
+            {access}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onRestart}
+          className="shrink-0 text-xs font-medium text-muted underline-offset-2 transition-colors hover:text-foreground hover:underline"
+        >
+          Run setup again
+        </button>
+      </div>
+
+      {/* ---- Section nav ---- */}
+      <nav
+        aria-label="Console sections"
+        className="mb-8 flex gap-6 overflow-x-auto border-b border-border code-scroll"
+      >
+        {VIEWS.map((v) => {
+          const isActive = view === v.id;
+          return (
+            <button
+              key={v.id}
+              type="button"
+              onClick={() => setView(v.id)}
+              aria-current={isActive ? "page" : undefined}
+              className={`relative shrink-0 whitespace-nowrap pb-3 text-sm transition-colors ${
+                isActive ? "font-medium text-foreground" : "text-muted hover:text-foreground"
+              }`}
+            >
+              {v.label}
+              {isActive && (
+                <span aria-hidden className="absolute inset-x-0 -bottom-px h-0.5 bg-accent" />
+              )}
+            </button>
+          );
+        })}
+      </nav>
+
+      {/* ---- Views ---- */}
+      {view === "config" && (
+        <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(360px,440px)]">
+          <div className="min-w-0 space-y-5">
+            <ServerSection form={form} set={set} />
+            <SecuritySection form={form} set={set} />
+            <ToolsSection form={form} set={set} />
+            <PolicySection form={form} set={set} />
+            <AccessSection form={form} set={set} />
+          </div>
+          <div className="min-w-0 lg:sticky lg:top-[4.5rem] lg:h-fit">
+            <OutputPanel tabs={tabs} connect={connectUrl(cfg)} features={features} />
+          </div>
+        </div>
+      )}
+
+      {view === "accounts" && (
+        <div className="max-w-3xl">
+          <AccountsPanel
+            boot={boot}
+            onBootChange={refreshBoot}
+            gotoDatabase={() => setView("database")}
+          />
+        </div>
+      )}
+
+      {view === "agent" && (
+        <div className="max-w-3xl">
+          <AgentAccessPanel cfg={cfg} onLoaded={setForm} />
+        </div>
+      )}
+
+      {view === "database" && (
+        <div className="max-w-3xl">
+          <DatabasePanel
+            onConfigured={refreshBoot}
+            gotoAccounts={() => setView("accounts")}
+          />
+        </div>
+      )}
+    </>
   );
 }

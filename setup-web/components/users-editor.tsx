@@ -6,7 +6,7 @@
 import { useState } from "react";
 import { ROLE_PRESETS, TOOL_NAMES, generateToken } from "@/lib/winbridge-config";
 import { newUser, type FormUser } from "@/lib/form-state";
-import { Field, TextArea, TextInput, Toggle, Warn } from "@/components/ui";
+import { Field, Select, TextArea, TextInput, Toggle, Warn } from "@/components/ui";
 
 const ROLES = ["admin", "operator", "readonly", "custom"];
 
@@ -73,23 +73,13 @@ export function UsersEditor({
         {users.map((u) => {
           const isOpen = expanded.has(u.id);
           return (
-            <div key={u.id} className="rounded-xl border border-border bg-background/60 p-4">
+            <div key={u.id} className="rounded-md border border-border bg-background/60 p-4">
               <div className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
                 <Field label="Name">
                   <TextInput value={u.name} onChange={(v) => update(u.id, { name: v })} placeholder="alice" mono />
                 </Field>
                 <Field label="Role" hint="Presets fill tools & command rules; edit below.">
-                  <select
-                    value={u.role}
-                    onChange={(e) => setRole(u.id, e.target.value)}
-                    className="h-9 w-full rounded-lg border border-border bg-background px-3 text-sm text-foreground shadow-xs outline-none transition hover:border-border-strong focus:border-accent focus:ring-2 focus:ring-accent/20"
-                  >
-                    {ROLES.map((r) => (
-                      <option key={r} value={r}>
-                        {r}
-                      </option>
-                    ))}
-                  </select>
+                  <Select value={u.role} onChange={(v) => setRole(u.id, v)} options={ROLES} />
                 </Field>
               </div>
 
@@ -100,14 +90,14 @@ export function UsersEditor({
                     <button
                       type="button"
                       onClick={() => update(u.id, { token: generateToken() })}
-                      className="inline-flex h-9 shrink-0 items-center rounded-lg border border-border bg-surface px-3 text-xs font-medium transition hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                      className="inline-flex h-9 shrink-0 items-center rounded-md border border-border bg-surface px-3 text-xs font-medium transition-colors hover:bg-surface-muted"
                     >
                       Regenerate
                     </button>
                     <button
                       type="button"
                       onClick={() => void navigator.clipboard?.writeText(u.token)}
-                      className="inline-flex h-9 shrink-0 items-center rounded-lg border border-border bg-surface px-3 text-xs font-medium transition hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+                      className="inline-flex h-9 shrink-0 items-center rounded-md border border-border bg-surface px-3 text-xs font-medium transition-colors hover:bg-surface-muted"
                     >
                       Copy
                     </button>
@@ -119,14 +109,14 @@ export function UsersEditor({
                 <button
                   type="button"
                   onClick={() => toggleExpanded(u.id)}
-                  className="text-xs font-medium text-accent hover:underline"
+                  className="text-xs font-medium text-accent-text hover:underline"
                 >
                   {isOpen ? "Hide permissions" : "Edit permissions (tools & commands)"}
                 </button>
                 <button
                   type="button"
                   onClick={() => remove(u.id)}
-                  className="text-xs font-medium text-red-600 hover:underline dark:text-red-400"
+                  className="text-xs font-medium text-danger hover:underline"
                 >
                   Remove
                 </button>
@@ -151,7 +141,7 @@ export function UsersEditor({
                               type="checkbox"
                               checked={u.tools.includes(tool)}
                               onChange={() => toggleTool(u, tool)}
-                              className="size-3.5 accent-[var(--color-accent,#2563eb)]"
+                              className="size-3.5 accent-[var(--accent)]"
                             />
                             <span className="font-mono">{tool}</span>
                           </label>
@@ -177,7 +167,7 @@ export function UsersEditor({
       <button
         type="button"
         onClick={add}
-        className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-dashed border-border-strong bg-surface px-4 text-sm font-medium transition hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+        className="inline-flex h-9 items-center gap-1.5 rounded-md border border-dashed border-border-strong bg-surface px-4 text-sm font-medium transition-colors hover:bg-surface-muted"
       >
         + Add user
       </button>

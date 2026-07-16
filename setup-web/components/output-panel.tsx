@@ -42,21 +42,16 @@ export function OutputPanel({
   };
 
   return (
-    <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-xs">
-      {/* ---- Header: connect URL + summary ---- */}
-      <div className="space-y-3 border-b border-border px-4 py-4">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
-            Live output
-          </p>
-          <span className="inline-flex items-center gap-1.5 text-[11px] text-muted">
-            <span className="size-1.5 rounded-full bg-emerald-500" aria-hidden />
-            updates as you type
-          </span>
+    <div className="overflow-hidden rounded-lg border border-border bg-surface">
+      {/* ---- Header: connect URL + enabled features ---- */}
+      <div className="space-y-4 border-b border-border px-5 py-5">
+        <div className="flex items-baseline justify-between gap-3">
+          <p className="eyebrow">Generated output</p>
+          <span className="text-[11px] text-faint">updates as you type</span>
         </div>
 
         <div>
-          <p className="mb-1 text-xs text-muted">Connect URL</p>
+          <p className="mb-1.5 text-xs text-muted">Connect URL</p>
           <div className="flex items-center gap-1.5">
             <code className="min-w-0 flex-1 truncate rounded-md border border-border bg-background px-2.5 py-1.5 font-mono text-[12.5px]">
               {connect}
@@ -65,10 +60,10 @@ export function OutputPanel({
               type="button"
               onClick={() => copy(connect, "url")}
               aria-label="Copy connect URL"
-              className="flex size-8 shrink-0 items-center justify-center rounded-md border border-border text-muted transition hover:bg-surface-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+              className="flex size-8 shrink-0 items-center justify-center rounded-md border border-border text-muted transition-colors hover:bg-surface-muted hover:text-foreground"
             >
               {copied === "url" ? (
-                <CheckIcon className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                <CheckIcon className="size-3.5 text-ok" />
               ) : (
                 <CopyIcon className="size-3.5" />
               )}
@@ -77,20 +72,14 @@ export function OutputPanel({
         </div>
 
         {features.length > 0 && (
-          <div className="flex flex-wrap gap-1.5" aria-label="Enabled features">
+          <p className="font-mono text-[11.5px] leading-relaxed text-muted" aria-label="Enabled features">
             {features.map((f, i) => (
-              <span
-                key={f}
-                className={
-                  i === 0
-                    ? "inline-flex items-center rounded-full border border-border bg-surface-muted px-2 py-0.5 font-mono text-[11px] text-muted"
-                    : "inline-flex items-center rounded-full border border-accent/25 bg-accent/10 px-2 py-0.5 font-mono text-[11px] text-accent"
-                }
-              >
-                {f}
+              <span key={f}>
+                {i > 0 && <span className="mx-1.5 text-faint" aria-hidden>·</span>}
+                <span className={i === 0 ? undefined : "text-accent-text"}>{f}</span>
               </span>
             ))}
-          </div>
+          </p>
         )}
       </div>
 
@@ -98,7 +87,7 @@ export function OutputPanel({
       <div
         role="tablist"
         aria-label="Generated output"
-        className="flex gap-0.5 overflow-x-auto border-b border-border bg-surface-muted/60 px-2 code-scroll"
+        className="flex gap-1 overflow-x-auto border-b border-border bg-surface-muted/50 px-3 code-scroll"
       >
         {names.map((n) => {
           const isActive = active === n;
@@ -110,16 +99,13 @@ export function OutputPanel({
               aria-selected={isActive}
               aria-controls="output-tabpanel"
               onClick={() => setActive(n)}
-              className={`relative shrink-0 whitespace-nowrap px-3 py-2.5 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent/40 ${
-                isActive ? "text-foreground" : "text-muted hover:text-foreground"
+              className={`relative shrink-0 whitespace-nowrap px-2.5 py-2.5 text-xs transition-colors ${
+                isActive ? "font-medium text-foreground" : "text-muted hover:text-foreground"
               }`}
             >
               {n}
               {isActive && (
-                <span
-                  aria-hidden
-                  className="absolute inset-x-3 -bottom-px h-0.5 rounded-full bg-accent"
-                />
+                <span aria-hidden className="absolute inset-x-2.5 -bottom-px h-0.5 bg-accent" />
               )}
             </button>
           );
@@ -128,17 +114,17 @@ export function OutputPanel({
 
       {/* ---- Code viewer (always dark) ---- */}
       <div id="output-tabpanel" role="tabpanel" aria-label={active} className="bg-code">
-        <div className="flex items-center justify-between gap-2 border-b border-white/10 px-4 py-2">
+        <div className="flex items-center justify-between gap-2 border-b border-code-border px-4 py-2">
           <span className="truncate font-mono text-[11px] text-code-muted">
             {TAB_META[active] ?? active}
           </span>
           <button
             type="button"
             onClick={() => copy(current, "code")}
-            className={`inline-flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/50 ${
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium transition-colors ${
               copied === "code"
-                ? "text-emerald-400"
-                : "text-code-muted hover:bg-white/10 hover:text-white"
+                ? "text-code-ok"
+                : "text-code-muted hover:bg-white/10 hover:text-code-fg"
             }`}
           >
             {copied === "code" ? (

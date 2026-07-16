@@ -1,44 +1,52 @@
 "use client";
 
-// Presentational form primitives for the setup wizard. Purely visual — all
-// state lives in app/page.tsx and flows in through props.
+// Presentational primitives shared across the console. Purely visual — all
+// state lives in the pages/panels and flows in through props.
 
-import { AlertIcon } from "@/components/icons";
+/* ------------------------------- Buttons --------------------------------- */
 
-/* ------------------------------- Section -------------------------------- */
+export const btnPrimary =
+  "inline-flex h-9 items-center justify-center gap-2 rounded-md bg-accent px-4 text-sm font-medium " +
+  "text-accent-fg transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-45";
+
+export const btnSecondary =
+  "inline-flex h-9 items-center justify-center gap-2 rounded-md border border-border-strong bg-surface px-4 " +
+  "text-sm font-medium text-foreground transition-colors hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-45";
+
+export const btnDanger =
+  "inline-flex h-9 items-center justify-center gap-2 rounded-md border border-danger/40 px-4 text-sm " +
+  "font-medium text-danger transition-colors hover:bg-danger/10 disabled:cursor-not-allowed disabled:opacity-45";
+
+/* ------------------------------- Section --------------------------------- */
 
 export function Section({
-  icon,
+  eyebrow,
   title,
   desc,
   children,
 }: {
-  icon: React.ReactNode;
+  eyebrow?: string;
   title: string;
   desc?: string;
   children: React.ReactNode;
 }) {
   return (
-    <section className="overflow-hidden rounded-xl border border-border bg-surface shadow-xs">
-      <header className="flex items-start gap-3 border-b border-border px-5 py-4">
-        <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent">
-          {icon}
-        </span>
-        <div className="min-w-0">
-          <h2 className="text-sm font-semibold tracking-tight">{title}</h2>
-          {desc && <p className="mt-0.5 text-xs leading-relaxed text-muted">{desc}</p>}
-        </div>
+    <section className="rounded-lg border border-border bg-surface">
+      <header className="border-b border-border px-6 py-5">
+        {eyebrow && <p className="eyebrow mb-2">{eyebrow}</p>}
+        <h2 className="text-[15px] font-semibold tracking-tight">{title}</h2>
+        {desc && <p className="mt-1 max-w-prose text-[13px] leading-relaxed text-muted">{desc}</p>}
       </header>
-      <div className="space-y-5 p-5">{children}</div>
+      <div className="space-y-6 px-6 py-6">{children}</div>
     </section>
   );
 }
 
 export function Grid({ children }: { children: React.ReactNode }) {
-  return <div className="grid grid-cols-1 gap-x-4 gap-y-5 sm:grid-cols-2">{children}</div>;
+  return <div className="grid grid-cols-1 gap-x-5 gap-y-6 sm:grid-cols-2">{children}</div>;
 }
 
-/* -------------------------------- Field --------------------------------- */
+/* -------------------------------- Field ---------------------------------- */
 
 export function Field({
   label,
@@ -62,12 +70,11 @@ export function Field({
   );
 }
 
-/* -------------------------------- Inputs --------------------------------- */
+/* -------------------------------- Inputs ---------------------------------- */
 
 const inputClass =
-  "w-full rounded-lg border border-border bg-background text-sm text-foreground shadow-xs " +
-  "placeholder:text-faint transition-[border-color,box-shadow] outline-none " +
-  "hover:border-border-strong focus:border-accent focus:ring-2 focus:ring-accent/20";
+  "w-full rounded-md border border-border bg-background text-sm text-foreground " +
+  "placeholder:text-faint transition-colors hover:border-border-strong focus:border-border-strong";
 
 export function TextInput({
   value,
@@ -75,16 +82,18 @@ export function TextInput({
   placeholder,
   mono,
   inputMode,
+  type = "text",
 }: {
   value: string;
   onChange: (v: string) => void;
   placeholder?: string;
   mono?: boolean;
   inputMode?: "numeric";
+  type?: "text" | "password";
 }) {
   return (
     <input
-      type="text"
+      type={type}
       value={value}
       inputMode={inputMode}
       onChange={(e) => onChange(e.target.value)}
@@ -118,7 +127,31 @@ export function TextArea({
   );
 }
 
-/* -------------------------------- Toggle --------------------------------- */
+export function Select({
+  value,
+  onChange,
+  options,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  options: string[];
+}) {
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={`${inputClass} h-9 px-3`}
+    >
+      {options.map((o) => (
+        <option key={o} value={o}>
+          {o}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+/* -------------------------------- Toggle ---------------------------------- */
 
 export function Toggle({
   checked,
@@ -137,16 +170,16 @@ export function Toggle({
       role="switch"
       aria-checked={checked}
       onClick={() => onChange(!checked)}
-      className="group flex items-start gap-3 text-left outline-none"
+      className="group flex items-start gap-3 rounded-sm text-left"
     >
       <span
-        className={`relative mt-px inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors duration-200 group-focus-visible:ring-2 group-focus-visible:ring-accent/40 group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-surface ${
-          checked ? "bg-accent" : "bg-border-strong group-hover:bg-faint/70"
+        className={`relative mt-px inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+          checked ? "bg-accent" : "bg-border-strong group-hover:bg-faint/60"
         }`}
       >
         <span
-          className={`inline-block size-3.5 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${
-            checked ? "translate-x-[18px]" : "translate-x-[3px]"
+          className={`inline-block size-3.5 transform rounded-full transition-transform ${
+            checked ? "translate-x-[18px] bg-accent-fg" : "translate-x-[3px] bg-background"
           }`}
         />
       </span>
@@ -160,16 +193,28 @@ export function Toggle({
   );
 }
 
-/* ------------------------------- Warning --------------------------------- */
+/* ------------------------------- Warning ---------------------------------- */
 
 export function Warn({ children }: { children: React.ReactNode }) {
   return (
     <div
       role="alert"
-      className="flex items-start gap-2.5 rounded-lg border border-amber-500/30 bg-amber-500/8 px-3 py-2.5 text-xs leading-relaxed text-amber-800 dark:border-amber-400/25 dark:bg-amber-400/10 dark:text-amber-200"
+      className="border-l-2 border-warn bg-warn/5 py-2.5 pl-4 pr-3 text-[13px] leading-relaxed text-warn"
     >
-      <AlertIcon className="mt-px size-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
-      <p>{children}</p>
+      {children}
     </div>
+  );
+}
+
+/* ------------------------------ Status line ------------------------------- */
+
+export function StatusMsg({ tone, children }: { tone: "ok" | "err"; children: React.ReactNode }) {
+  return (
+    <p
+      role="status"
+      className={`text-[13px] leading-relaxed ${tone === "ok" ? "text-ok" : "text-danger"}`}
+    >
+      {children}
+    </p>
   );
 }
