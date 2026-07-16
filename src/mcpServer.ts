@@ -114,12 +114,21 @@ const screenshotInputSchema = {
     .enum(["png", "jpeg"])
     .optional()
     .describe("Image format for the capture. Defaults to png."),
-  path: z
-    .string()
-    .optional()
-    .describe("Optional path on the Windows host to also save the image to. When omitted, a temp file is used and removed after capture."),
   timeoutMs: z.number().positive().optional().describe("Capture timeout in milliseconds")
 };
+
+/**
+ * Whether `principal` may capture the screen. Screen capture is off unless the
+ * operator enabled it; when enabled, an empty role list allows any principal,
+ * otherwise the principal's role must be listed.
+ */
+function isScreenshotAllowed(config: AppConfig, principal: Principal): boolean {
+  if (!config.screenshot.enabled) {
+    return false;
+  }
+  const roles = config.screenshot.allowedRoles;
+  return roles.length === 0 || roles.includes(principal.role);
+}
 
 export function createWinBridgeMcpServer(
   config: AppConfig,
@@ -237,28 +246,39 @@ export function createWinBridgeMcpServer(
     async () => jsonToolResult({ sessions: sessions.list() })
   );
 
-  server.registerTool(
-    "take_screenshot",
-    {
-      title: "Take Screenshot",
-      description:
-        "Capture the current screen of the Windows host as a PNG or JPEG image. Captures the full virtual desktop across all monitors. Requires an active interactive desktop session.",
-      inputSchema: screenshotInputSchema
-    },
-    async (args) => {
-      const result = await captureScreenshot(config, args);
-      await audit.log({
-        time: new Date().toISOString(),
-        principal: principal.name,
-        role: principal.role,
-        tool: "take_screenshot",
-        decision: result.success ? "allowed" : "error",
-        durationMs: result.durationMs,
-        reason: result.success ? undefined : result.error
-      });
-      return screenshotToolResult(result);
-    }
-  );
+  // Screen capture is a read/exfiltration capability, so it is only exposed when
+  // the operator has enabled it (WINBRIDGE_ALLOW_SCREENSHOT) for a role that
+  // includes this principal.
+  if (isScreenshotAllowed(config, principal)) {
+    server.registerTool(
+      "take_screenshot",
+      {
+        title: "Take Screenshot",
+        description:
+          "Capture the current screen of the Windows host as a PNG or JPEG image. Captures the full virtual desktop across all monitors. Requires an active interactive desktop session.",
+        inputSchema: screenshotInputSchema
+      },
+      async (args) => {
+        const result = await captureScreenshot(config, {
+          ...args,
+          dir: config.screenshot.dir,
+          retentionMs: config.screenshot.retentionMs
+        });
+        await audit.log({
+          time: new Date().toISOString(),
+          principal: principal.name,
+          role: principal.role,
+          tool: "take_screenshot",
+          decision: result.success ? "allowed" : "error",
+          durationMs: result.durationMs,
+          bytes: result.success ? result.bytes : undefined,
+          path: result.path,
+          reason: result.success ? undefined : result.error
+        });
+        return screenshotToolResult(result);
+      }
+    );
+  }
 
   return server;
 }

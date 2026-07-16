@@ -33,8 +33,11 @@ export type ScreenshotFormat = "png" | "jpeg";
 
 export type ScreenshotOptions = {
   format?: ScreenshotFormat;
-  path?: string;
   timeoutMs?: number;
+  /** Server-owned directory to write the capture to. Defaults to a temp subdir. */
+  dir?: string;
+  /** Delete captures in `dir` older than this many ms before capturing. */
+  retentionMs?: number;
 };
 
 export type ScreenshotResult = {
@@ -46,6 +49,7 @@ export type ScreenshotResult = {
   height: number | null;
   bytes: number;
   base64: string;
+  /** Server-side path the capture was saved to (kept until the retention sweep). */
   path?: string;
   durationMs: number;
   error?: string;

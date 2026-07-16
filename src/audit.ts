@@ -18,6 +18,10 @@ export type AuditEntry = {
   reason?: string;
   exitCode?: number | null;
   durationMs?: number;
+  /** Captured image size in bytes, for take_screenshot. */
+  bytes?: number;
+  /** Server-side path a take_screenshot capture was written to. */
+  path?: string;
 };
 
 export interface AuditLogger {

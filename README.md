@@ -49,7 +49,7 @@ WinBridge exposes six MCP tools:
 | `powershell_send` | Send a command to a persistent session. |
 | `powershell_close_session` | Close a persistent session. |
 | `powershell_list_sessions` | List active sessions. |
-| `take_screenshot` | Capture the current screen of the Windows host as an image. |
+| `take_screenshot` | Capture the current screen of the Windows host as an image. Off by default (see below). |
 
 Command results include:
 
@@ -84,6 +84,16 @@ block:
 Screen capture needs an active interactive desktop session. If WinBridge runs in
 a non-interactive service context (Windows session 0), the capture fails and the
 tool returns `success: false` with the PowerShell error instead of an image.
+
+Because screen capture reads whatever is on the desktop, it is a
+read/exfiltration capability the command policy cannot express, so it is
+**disabled by default**. Enable it with `WINBRIDGE_ALLOW_SCREENSHOT=1`, and
+optionally restrict it to specific principal roles with `WINBRIDGE_SCREENSHOT_ROLES`.
+When disabled (or when the caller's role is not permitted) the tool is not
+exposed to that principal at all. Captures are written to a **server-owned**
+directory (`WINBRIDGE_SCREENSHOT_DIR`) — callers cannot choose the path — and are
+automatically deleted after `WINBRIDGE_SCREENSHOT_RETENTION_HOURS` (default `8`)
+so they do not accumulate on the host.
 
 ## Quickstart
 
@@ -234,6 +244,10 @@ WinBridge reads `WINBRIDGE_*` variables. The legacy `PENDRAGON_*` names are stil
 | `WINBRIDGE_TLS_KEY` | empty | PEM private key path for TLS. |
 | `WINBRIDGE_TLS_KEY_PASSPHRASE` | empty | Passphrase for an encrypted TLS key. |
 | `WINBRIDGE_TLS_CLIENT_CA` | empty | PEM CA bundle to verify client certificates. Enables mutual TLS (requires TLS). |
+| `WINBRIDGE_ALLOW_SCREENSHOT` | `0` | Set to `1` to enable the `take_screenshot` tool. Disabled by default. |
+| `WINBRIDGE_SCREENSHOT_ROLES` | empty | Comma-separated principal roles allowed to capture. Empty means any authenticated principal (when enabled). |
+| `WINBRIDGE_SCREENSHOT_DIR` | temp subdir | Server-owned directory captures are written to. Callers cannot override it. |
+| `WINBRIDGE_SCREENSHOT_RETENTION_HOURS` | `8` | Captures older than this are deleted (on startup and before each capture). |
 | `WINBRIDGE_URL` | `http://127.0.0.1:7573/mcp` | Diagnostic client URL for one WinBridge server. |
 | `WINBRIDGE_URLS` | empty | Diagnostic client comma-separated URLs for multiple servers using `WINBRIDGE_TOKEN`. |
 | `WINBRIDGE_TARGETS` | empty | Diagnostic client JSON array for named servers and per-target token env vars. |

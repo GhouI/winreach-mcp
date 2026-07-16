@@ -33,6 +33,7 @@ function makeConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     endpointPath: "/mcp",
     principals: [createPrimaryPrincipal("admin-token", { allow: [], deny: [] })],
     globalPolicy: { allow: [], deny: compilePatterns(["Remove-Item", "Format-Volume"], "deny") },
+    screenshot: { enabled: false, allowedRoles: [], dir: join(tmpdir(), "winbridge-shots-test"), retentionMs: 0 },
     allowedOrigins: [],
     defaultCwd: process.cwd(),
     defaultTimeoutMs: 5000,
