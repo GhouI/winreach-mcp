@@ -115,7 +115,7 @@ $env:WINBRIDGE_FILE_ROOT = "C:\winbridge-files"
   parent directories inside the root as needed.
 - `file_download` returns the file as base64; set `deleteSource: true` to **move**
   it (the server copy is deleted after a successful read).
-- Files larger than `WINBRIDGE_MAX_FILE_BYTES` (default 50 MB) are rejected in
+- Files larger than `WINBRIDGE_MAX_FILE_BYTES` (default 75 MB) are rejected in
   either direction.
 - Every transfer is written to the audit log (tool, principal, server path, size).
 
@@ -273,7 +273,7 @@ WinBridge reads `WINBRIDGE_*` variables. The legacy `PENDRAGON_*` names are stil
 | `WINBRIDGE_SCREENSHOT_DIR` | temp subdir | Server-owned directory captures are written to. Callers cannot override it. |
 | `WINBRIDGE_SCREENSHOT_RETENTION_HOURS` | `8` | Captures older than this are deleted (on startup and before each capture). Set `0` to keep them indefinitely. |
 | `WINBRIDGE_FILE_ROOT` | empty | Sandbox root for `file_upload`/`file_download`. Setting it enables the tools; all transfer paths resolve within it. |
-| `WINBRIDGE_MAX_FILE_BYTES` | `52428800` | Maximum bytes per transferred file (both directions). Default 50 MB. |
+| `WINBRIDGE_MAX_FILE_BYTES` | `78643200` | Maximum bytes per transferred file (both directions). Default 75 MB. |
 | `WINBRIDGE_URL` | `http://127.0.0.1:7573/mcp` | Diagnostic client URL for one WinBridge server. |
 | `WINBRIDGE_URLS` | empty | Diagnostic client comma-separated URLs for multiple servers using `WINBRIDGE_TOKEN`. |
 | `WINBRIDGE_TARGETS` | empty | Diagnostic client JSON array for named servers and per-target token env vars. |

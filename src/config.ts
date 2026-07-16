@@ -196,7 +196,7 @@ function loadScreenshotConfig(): ScreenshotConfig {
   };
 }
 
-const DEFAULT_MAX_FILE_BYTES = 50 * 1024 * 1024;
+const DEFAULT_MAX_FILE_BYTES = 75 * 1024 * 1024;
 
 function loadFileTransferConfig(): FileTransferConfig {
   const rawRoot = readEnv("FILE_ROOT")?.trim();
