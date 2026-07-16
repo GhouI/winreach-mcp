@@ -10,8 +10,9 @@ import { createAuditLogger, type AuditLogger } from "./audit.js";
 import { evaluatePolicies } from "./policy.js";
 import type { Principal } from "./principals.js";
 import { executePowerShell } from "./powershell/shell.js";
+import { captureScreenshot } from "./powershell/screenshot.js";
 import { PowerShellSessionManager } from "./powershell/session.js";
-import type { PowerShellResult } from "./powershell/types.js";
+import type { PowerShellResult, ScreenshotResult } from "./powershell/types.js";
 
 const commandInputSchema = {
   command: z.string().min(1).describe("PowerShell command to execute"),
@@ -106,6 +107,27 @@ async function auditResult(
     exitCode: result.exitCode,
     durationMs: result.durationMs
   });
+}
+
+const screenshotInputSchema = {
+  format: z
+    .enum(["png", "jpeg"])
+    .optional()
+    .describe("Image format for the capture. Defaults to png."),
+  timeoutMs: z.number().positive().optional().describe("Capture timeout in milliseconds")
+};
+
+/**
+ * Whether `principal` may capture the screen. Screen capture is off unless the
+ * operator enabled it; when enabled, an empty role list allows any principal,
+ * otherwise the principal's role must be listed.
+ */
+function isScreenshotAllowed(config: AppConfig, principal: Principal): boolean {
+  if (!config.screenshot.enabled) {
+    return false;
+  }
+  const roles = config.screenshot.allowedRoles;
+  return roles.length === 0 || roles.includes(principal.role);
 }
 
 export function createWinBridgeMcpServer(
@@ -224,6 +246,44 @@ export function createWinBridgeMcpServer(
     async () => jsonToolResult({ sessions: sessions.list() })
   );
 
+  // Screen capture is a read/exfiltration capability, so it is only exposed when
+  // the operator has enabled it (WINBRIDGE_ALLOW_SCREENSHOT) for a role that
+  // includes this principal.
+  if (isScreenshotAllowed(config, principal)) {
+    server.registerTool(
+      "take_screenshot",
+      {
+        title: "Take Screenshot",
+        description:
+          "Capture the current screen of the Windows host as a PNG or JPEG image. Captures the full virtual desktop across all monitors. Requires an active interactive desktop session.",
+        inputSchema: screenshotInputSchema
+      },
+      async (args) => {
+        const result = await captureScreenshot(config, {
+          ...args,
+          dir: config.screenshot.dir,
+          retentionMs: config.screenshot.retentionMs
+        });
+        // The call is authorized (an unauthorized principal never reaches here,
+        // since the tool is only registered when allowed). A runtime capture
+        // failure is recorded in `reason`, mirroring how the other tools log a
+        // successful authorization with the failure carried in the result.
+        await audit.log({
+          time: new Date().toISOString(),
+          principal: principal.name,
+          role: principal.role,
+          tool: "take_screenshot",
+          decision: "allowed",
+          durationMs: result.durationMs,
+          bytes: result.success ? result.bytes : undefined,
+          path: result.path,
+          reason: result.success ? undefined : result.error
+        });
+        return screenshotToolResult(result);
+      }
+    );
+  }
+
   return server;
 }
 
@@ -305,6 +365,47 @@ function jsonToolResult(value: unknown) {
       {
         type: "text" as const,
         text: JSON.stringify(value, null, 2)
+      }
+    ]
+  };
+}
+
+function screenshotToolResult(result: ScreenshotResult) {
+  if (!result.success) {
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: JSON.stringify(
+            {
+              commandId: result.commandId,
+              success: false,
+              durationMs: result.durationMs,
+              error: result.error ?? "Screen capture failed."
+            },
+            null,
+            2
+          )
+        }
+      ],
+      isError: true
+    };
+  }
+
+  // Do not surface the server-side file path or raw base64 to the caller; the
+  // path is internal (recorded in the audit log instead) and the image bytes are
+  // already returned as the image content block.
+  const { base64, path: _serverPath, ...metadata } = result;
+  return {
+    content: [
+      {
+        type: "image" as const,
+        data: base64,
+        mimeType: result.mimeType
+      },
+      {
+        type: "text" as const,
+        text: JSON.stringify(metadata, null, 2)
       }
     ]
   };

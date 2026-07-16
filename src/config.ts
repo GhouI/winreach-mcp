@@ -1,3 +1,5 @@
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type { TunnelProvider } from "./tunnel.js";
 import type { TlsConfig } from "./tls.js";
 import { compilePatterns, type CommandPolicy } from "./policy.js";
@@ -15,6 +17,22 @@ export type TunnelConfig = {
   binaryPath?: string;
 };
 
+/**
+ * Authorization for the `take_screenshot` tool. Screen capture is a read/exfil
+ * capability the command policy cannot express (there is no command string), so
+ * it is disabled by default and gated separately.
+ */
+export type ScreenshotConfig = {
+  /** When false the tool is not registered at all. */
+  enabled: boolean;
+  /** Roles permitted to capture. Empty means any authenticated principal. */
+  allowedRoles: string[];
+  /** Server-owned directory captures are written to. Callers cannot override it. */
+  dir: string;
+  /** Captures older than this are deleted. `0` disables the retention sweep. */
+  retentionMs: number;
+};
+
 export type AppConfig = {
   name: string;
   version: string;
@@ -29,6 +47,8 @@ export type AppConfig = {
   auditLogPath?: string;
   /** In-app TLS/mTLS settings, or undefined for plain HTTP. */
   tls?: TlsConfig;
+  /** Screen-capture authorization. Disabled unless explicitly turned on. */
+  screenshot: ScreenshotConfig;
   allowedOrigins: string[];
   shellPath?: string;
   defaultCwd: string;
@@ -135,6 +155,30 @@ function loadTunnelConfig(): TunnelConfig {
   };
 }
 
+const DEFAULT_SCREENSHOT_RETENTION_HOURS = 8;
+
+/** Retention hours: non-negative, where `0` disables the sweep (keep forever). */
+function readScreenshotRetentionHours(): number {
+  const raw = readEnv("SCREENSHOT_RETENTION_HOURS")?.trim();
+  if (!raw) {
+    return DEFAULT_SCREENSHOT_RETENTION_HOURS;
+  }
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new Error("WINBRIDGE_SCREENSHOT_RETENTION_HOURS must be a non-negative number");
+  }
+  return parsed;
+}
+
+function loadScreenshotConfig(): ScreenshotConfig {
+  return {
+    enabled: readBoolEnv("ALLOW_SCREENSHOT", false),
+    allowedRoles: readListEnv("SCREENSHOT_ROLES"),
+    dir: readEnv("SCREENSHOT_DIR")?.trim() || join(tmpdir(), "winbridge-screenshots"),
+    retentionMs: readScreenshotRetentionHours() * 60 * 60 * 1000
+  };
+}
+
 function loadGlobalPolicy(): CommandPolicy {
   return {
     allow: compilePatterns(readPatternListEnv("COMMAND_ALLOWLIST"), "WINBRIDGE_COMMAND_ALLOWLIST"),
@@ -207,6 +251,7 @@ export function loadConfig(): AppConfig {
     globalPolicy,
     auditLogPath: readEnv("AUDIT_LOG")?.trim() || undefined,
     tls: loadTlsConfig(),
+    screenshot: loadScreenshotConfig(),
     allowedOrigins: readListEnv("ALLOWED_ORIGINS"),
     shellPath: readEnv("SHELL_PATH"),
     defaultCwd: readEnv("CWD") ?? process.cwd(),

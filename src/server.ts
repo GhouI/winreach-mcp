@@ -2,6 +2,7 @@ import { pathToFileURL } from "node:url";
 import type { AppConfig } from "./config.js";
 import { loadConfig, shortestTokenLength } from "./config.js";
 import { createWinBridgeApp } from "./mcpServer.js";
+import { sweepOldScreenshots } from "./powershell/screenshot.js";
 import { createServerForApp } from "./tls.js";
 import { startCloudflareTunnel, type TunnelHandle } from "./tunnel.js";
 
@@ -24,6 +25,14 @@ export async function main(): Promise<void> {
   const config = loadConfig();
   const tunnelRequested = config.tunnel.enabled || process.argv.includes("--tunnel");
   const { app, sessions } = createWinBridgeApp(config);
+
+  if (config.screenshot.enabled) {
+    // Prune any captures left over from a previous run before serving requests.
+    const removed = sweepOldScreenshots(config.screenshot.dir, config.screenshot.retentionMs);
+    if (removed > 0) {
+      console.log(`Removed ${removed} expired screenshot(s) from ${config.screenshot.dir}.`);
+    }
+  }
 
   const { server: httpServer, scheme } = createServerForApp(app, config.tls);
   httpServer.listen(config.port, config.host, () => {
