@@ -164,7 +164,6 @@ export default function Home() {
             form={form}
             set={set}
             cfg={cfg}
-            tabs={tabs}
             features={features}
             onFinish={finishSetup}
           />
@@ -186,17 +185,8 @@ export default function Home() {
 
       {/* ---- Footer ---- */}
       <footer className="border-t border-border">
-        <div className="mx-auto w-full max-w-6xl space-y-1.5 px-4 py-6 text-xs leading-relaxed text-muted sm:px-6">
-          <p>
-            Generated config is not applied automatically. Review it, then set the env
-            vars and run WinBridge on your host.
-          </p>
-          <p>
-            Source-IP filtering here is enforced via the generated Windows firewall
-            rule — WinBridge does not yet filter IPs in-app. The optional agent API
-            only stores this setup document; it never starts or reconfigures a
-            running server.
-          </p>
+        <div className="mx-auto w-full max-w-6xl px-4 py-6 text-xs leading-relaxed text-muted sm:px-6">
+          <p>Nothing is applied automatically — review the generated config and run WinBridge on your host.</p>
         </div>
       </footer>
     </div>
@@ -209,14 +199,12 @@ function Onboarding({
   form,
   set,
   cfg,
-  tabs,
   features,
   onFinish,
 }: {
   form: FormState;
   set: SetField;
   cfg: WinBridgeConfig;
-  tabs: Record<string, string>;
   features: string[];
   onFinish: () => void;
 }) {
@@ -231,67 +219,52 @@ function Onboarding({
   const last = STAGES.length - 1;
 
   return (
-    <>
+    <div className="mx-auto max-w-3xl space-y-6">
       {/* ---- Hero ---- */}
-      <div className="mb-10 max-w-2xl">
+      <div className="mb-2">
         <p className="eyebrow mb-3">Initial setup</p>
         <h1 className="text-[28px] font-semibold leading-tight tracking-tight sm:text-[32px]">
           Configure your WinBridge server
         </h1>
-        <p className="mt-3 max-w-prose text-sm leading-relaxed text-muted">
-          Six stages: bind the server, secure it, choose which tools are exposed, set
-          the command policy, and define how agents authenticate. Output is generated
-          locally as you type — nothing leaves your browser until you say so.
-        </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(360px,440px)]">
-        {/* ---- Stages (left) ---- */}
-        <div className="min-w-0 space-y-6">
-          <StageRail steps={STAGES} active={step} onSelect={setStep} flagged={flagged} />
+      <StageRail steps={STAGES} active={step} onSelect={setStep} flagged={flagged} />
 
-          {step === 0 && <ServerSection form={form} set={set} eyebrow="Stage 01" />}
-          {step === 1 && <SecuritySection form={form} set={set} eyebrow="Stage 02" />}
-          {step === 2 && <ToolsSection form={form} set={set} eyebrow="Stage 03" />}
-          {step === 3 && <PolicySection form={form} set={set} eyebrow="Stage 04" />}
-          {step === 4 && <AccessSection form={form} set={set} eyebrow="Stage 05" />}
-          {step === 5 && <ReviewSection form={form} cfg={cfg} features={features} />}
+      {step === 0 && <ServerSection form={form} set={set} eyebrow="Stage 01" />}
+      {step === 1 && <SecuritySection form={form} set={set} eyebrow="Stage 02" />}
+      {step === 2 && <ToolsSection form={form} set={set} eyebrow="Stage 03" />}
+      {step === 3 && <PolicySection form={form} set={set} eyebrow="Stage 04" />}
+      {step === 4 && <AccessSection form={form} set={set} eyebrow="Stage 05" />}
+      {step === 5 && <ReviewSection form={form} cfg={cfg} features={features} />}
 
-          {/* ---- Stage navigation ---- */}
-          <div className="flex items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={() => setStep((s) => Math.max(0, s - 1))}
-              disabled={step === 0}
-              className={btnSecondary}
-            >
-              Back
-            </button>
-            <span className="font-mono text-[11px] tabular-nums tracking-[0.08em] text-faint">
-              {String(step + 1).padStart(2, "0")} / {String(STAGES.length).padStart(2, "0")}
-            </span>
-            {step < last ? (
-              <button
-                type="button"
-                onClick={() => setStep((s) => Math.min(last, s + 1))}
-                className={btnPrimary}
-              >
-                Continue
-              </button>
-            ) : (
-              <button type="button" onClick={onFinish} className={btnPrimary}>
-                Finish setup
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* ---- Live output (right) ---- */}
-        <div className="min-w-0 lg:sticky lg:top-[4.5rem] lg:h-fit">
-          <OutputPanel tabs={tabs} connect={connectUrl(cfg)} features={features} />
-        </div>
+      {/* ---- Stage navigation ---- */}
+      <div className="flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => setStep((s) => Math.max(0, s - 1))}
+          disabled={step === 0}
+          className={btnSecondary}
+        >
+          Back
+        </button>
+        <span className="font-mono text-[11px] tabular-nums tracking-[0.08em] text-faint">
+          {String(step + 1).padStart(2, "0")} / {String(STAGES.length).padStart(2, "0")}
+        </span>
+        {step < last ? (
+          <button
+            type="button"
+            onClick={() => setStep((s) => Math.min(last, s + 1))}
+            className={btnPrimary}
+          >
+            Continue
+          </button>
+        ) : (
+          <button type="button" onClick={onFinish} className={btnPrimary}>
+            Finish setup
+          </button>
+        )}
       </div>
-    </>
+    </div>
   );
 }
 

@@ -16,62 +16,63 @@
 --------------------------------------------------------------------------- */
 
 :root {
-  /* neutrals (warm) */
-  --background: #faf9f5;
-  --surface: #fffefb;
-  --surface-muted: #f1efe9;
-  --foreground: #171512;
-  --muted: #5d584f;
-  --faint: #767065;
-  --border: #e7e4db;
-  --border-strong: #cfcabc;
+  /* cool neutrals (light) */
+  --background: #ffffff;
+  --surface: #ffffff;
+  --surface-muted: #f4f4f5;
+  --foreground: #0a0a0a;
+  --muted: #52525b;
+  --faint: #a1a1aa;
+  --border: #e4e4e7;
+  --border-strong: #d4d4d8;
 
-  /* amber accent */
-  --accent: #f0b429;
-  --accent-hover: #e0a51d;
-  --accent-fg: #171512;
-  --accent-text: #8a6200;
+  /* crisp yellow accent */
+  --accent: #facc15;
+  --accent-hover: #eab308;
+  --accent-fg: #0a0a0a;
+  --accent-text: #a16207; /* readable gold as text on white */
 
   /* semantics */
-  --warn: #9a4a00;
-  --ok: #1a7f37;
-  --danger: #b42318;
+  --warn: #c2410c;
+  --ok: #15803d;
+  --danger: #dc2626;
 
-  /* focus ring — bronze in light, amber in dark (>=3:1 on background) */
-  --focus: #8a6200;
+  --focus: #ca8a04;
 
-  /* code viewer (always dark, both themes) */
-  --code: #131211;
-  --code-fg: #e6e2d8;
-  --code-muted: #8f8a7d;
-  --code-accent: #f5c53d;
-  --code-ok: #56c271;
-  --code-border: #2b2823;
+  /* code viewer (always near-black) */
+  --code: #0a0a0a;
+  --code-fg: #ededed;
+  --code-muted: #8b8b8f;
+  --code-accent: #facc15;
+  --code-ok: #4ade80;
+  --code-border: #262626;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #121110;
-    --surface: #191714;
-    --surface-muted: #211e1a;
-    --foreground: #f0eee8;
-    --muted: #a6a094;
-    --faint: #7c766a;
-    --border: #2b2822;
-    --border-strong: #423d33;
+    /* true black + vivid yellow */
+    --background: #0a0a0a;
+    --surface: #141416;
+    --surface-muted: #1c1c1f;
+    --foreground: #fafafa;
+    --muted: #a1a1aa;
+    --faint: #71717a;
+    --border: #262629;
+    --border-strong: #3f3f46;
 
-    --accent: #f5c53d;
-    --accent-hover: #ffd44f;
-    --accent-fg: #171512;
-    --accent-text: #ecbe3e;
+    --accent: #facc15;
+    --accent-hover: #fde047;
+    --accent-fg: #0a0a0a;
+    --accent-text: #facc15; /* vivid yellow reads fine on black */
 
-    --warn: #f0913f;
-    --ok: #55c274;
-    --danger: #f28b82;
+    --warn: #fb923c;
+    --ok: #4ade80;
+    --danger: #f87171;
 
-    --focus: #ecbe3e;
+    --focus: #facc15;
 
-    --code: #100f0e;
+    --code: #000000;
+    --code-border: #1f1f1f;
   }
 }
 
