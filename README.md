@@ -201,7 +201,15 @@ WinBridge reads `WINBRIDGE_*` variables. The legacy `PENDRAGON_*` names are stil
 
 | Variable | Default | Description |
 | --- | --- | --- |
-| `WINBRIDGE_TOKEN` | required | Bearer token required for all MCP requests. |
+| `WINBRIDGE_TOKEN` | required* | Bearer token for a single full-access admin. *Required unless `WINBRIDGE_PRINCIPALS` is set. |
+| `WINBRIDGE_PRINCIPALS` | empty | JSON array of per-user principals: `[{"name","role","token"\|"tokenEnv","allow":[],"deny":[]}]`. Enables per-user authorization. |
+| `WINBRIDGE_COMMAND_ALLOWLIST` | empty | Regex allowlist (comma-separated or JSON array). If non-empty, only matching commands run. |
+| `WINBRIDGE_COMMAND_DENYLIST` | empty | Regex denylist (comma-separated or JSON array). Matching commands are blocked; deny wins over allow. |
+| `WINBRIDGE_AUDIT_LOG` | empty | Path to an append-only JSONL audit log of every tool call. |
+| `WINBRIDGE_TLS_CERT` | empty | PEM certificate path. Set with `WINBRIDGE_TLS_KEY` to serve HTTPS in-app. |
+| `WINBRIDGE_TLS_KEY` | empty | PEM private key path for TLS. |
+| `WINBRIDGE_TLS_KEY_PASSPHRASE` | empty | Passphrase for an encrypted TLS key. |
+| `WINBRIDGE_TLS_CLIENT_CA` | empty | PEM CA bundle to verify client certificates. Enables mutual TLS (requires TLS). |
 | `WINBRIDGE_URL` | `http://127.0.0.1:7573/mcp` | Diagnostic client URL for one WinBridge server. |
 | `WINBRIDGE_URLS` | empty | Diagnostic client comma-separated URLs for multiple servers using `WINBRIDGE_TOKEN`. |
 | `WINBRIDGE_TARGETS` | empty | Diagnostic client JSON array for named servers and per-target token env vars. |
@@ -229,17 +237,64 @@ WinBridge is a remote command-execution server. Treat it as sensitive infrastruc
 - Run as a dedicated low-privilege Windows user when possible.
 - Rotate tokens after demos, testing sessions, and shared access.
 
-See [SECURITY.md](SECURITY.md) for more detail.
+### Hardening
+
+WinBridge can now enforce transport security, per-user authorization, command policy, and auditing without an external proxy.
+
+**Serve HTTPS in-app (optionally with mutual TLS):**
+
+```powershell
+$env:WINBRIDGE_TOKEN = "replace-with-a-long-random-token"
+$env:WINBRIDGE_TLS_CERT = "C:\certs\winbridge-cert.pem"
+$env:WINBRIDGE_TLS_KEY  = "C:\certs\winbridge-key.pem"
+# Require client certificates (mTLS): connections without a cert signed by this CA
+# are dropped during the TLS handshake, before the bearer-token check.
+$env:WINBRIDGE_TLS_CLIENT_CA = "C:\certs\client-ca.pem"
+npm run dev
+```
+
+**Give each client its own identity, role, and command policy:**
+
+```powershell
+$env:WINBRIDGE_PRINCIPALS = @'
+[
+  { "name": "ci",    "role": "admin",    "tokenEnv": "CI_TOKEN" },
+  { "name": "agent", "role": "readonly", "tokenEnv": "AGENT_TOKEN",
+    "allow": ["^Get-", "^Test-"], "deny": ["Remove-Item", "Stop-Service"] }
+]
+'@
+```
+
+**Apply a deployment-wide guardrail and record everything:**
+
+```powershell
+$env:WINBRIDGE_COMMAND_DENYLIST = "Remove-Item -Recurse,Format-Volume,Stop-Computer"
+$env:WINBRIDGE_AUDIT_LOG = "C:\logs\winbridge-audit.jsonl"
+```
+
+The global policy plus the caller's principal policy must both allow a command; deny always wins, and a non-empty allowlist blocks anything it does not match. Blocked calls return an MCP error and are written to the audit log.
+
+**Install as a Windows service under a dedicated account:**
+
+```powershell
+npm run build
+$pw = Read-Host -AsSecureString "Service account password"
+./scripts/install-service.ps1 -EnvFile .env -ServiceAccount ".\winbridge" -ServiceAccountPassword $pw
+# Remove later with: ./scripts/uninstall-service.ps1
+```
+
+See [SECURITY.md](SECURITY.md) for the full control matrix and what remains out of scope.
 
 ## Roadmap
 
+Shipped: in-app HTTPS/mTLS, per-client authorization, command allow/deny policy, audit logging, and a Windows service installer (see [Hardening](#hardening)).
+
+Still planned:
+
 - Named Cloudflare tunnels for stable hostnames
-- HTTPS or reverse-proxy deployment examples
-- Windows service installation
-- Richer audit logs
-- Optional command policy controls
+- Request-level Windows Integrated Authentication (Negotiate/NTLM)
+- Rate limiting and per-principal quotas
 - Git Bash support
-- Per-client authorization
 - Packaged releases
 
 ## Contributing

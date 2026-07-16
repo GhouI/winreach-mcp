@@ -1,20 +1,34 @@
 # Security Policy
 
-WinBridge executes arbitrary PowerShell after bearer-token authentication. A compromised token is equivalent to command execution as the user running the server.
+WinBridge executes arbitrary PowerShell after authentication. A compromised token is equivalent to command execution as the user running the server. The features below reduce, but do not eliminate, that risk — treat WinBridge as sensitive infrastructure.
 
 ## Recommended Deployment
 
 - Bind to `127.0.0.1` by default.
-- Put remote access behind a trusted tunnel, VPN, or reverse proxy with TLS.
-- Use a dedicated Windows account with the minimum permissions needed.
-- Rotate `WINBRIDGE_TOKEN` regularly.
-- Capture and retain command audit logs when deploying outside local development.
+- Terminate TLS in the app (`WINBRIDGE_TLS_CERT`/`WINBRIDGE_TLS_KEY`) or put remote access behind a trusted tunnel, VPN, or reverse proxy with TLS.
+- Require client certificates (mTLS) for internet-facing instances (`WINBRIDGE_TLS_CLIENT_CA`).
+- Use a dedicated Windows account with the minimum permissions needed. The service installer (`scripts/install-service.ps1 -ServiceAccount`) configures this for you.
+- Rotate tokens regularly.
+- Give each client its own principal (`WINBRIDGE_PRINCIPALS`) so tokens can be rotated and revoked independently.
+- Constrain what can run with command allow/deny lists (`WINBRIDGE_COMMAND_ALLOWLIST`/`WINBRIDGE_COMMAND_DENYLIST`, or per-principal `allow`/`deny`).
+- Enable the audit log (`WINBRIDGE_AUDIT_LOG`) and retain it when deploying outside local development.
+
+## Implemented Controls
+
+| Control | How to enable | Notes |
+| --- | --- | --- |
+| In-app TLS termination | `WINBRIDGE_TLS_CERT` + `WINBRIDGE_TLS_KEY` (+ `WINBRIDGE_TLS_KEY_PASSPHRASE`) | WinBridge serves HTTPS directly; no reverse proxy required. |
+| Mutual TLS (mTLS) | `WINBRIDGE_TLS_CLIENT_CA` (requires TLS) | Clients without a certificate signed by the CA are rejected during the TLS handshake, before the token check. |
+| Per-user authorization | `WINBRIDGE_PRINCIPALS` (JSON array) | Each principal has its own token, role, and optional command policy. The legacy `WINBRIDGE_TOKEN` remains a single full-access admin. |
+| Command allow/deny lists | `WINBRIDGE_COMMAND_ALLOWLIST` / `WINBRIDGE_COMMAND_DENYLIST`, plus per-principal `allow`/`deny` | Case-insensitive regex. Deny always wins; a non-empty allowlist blocks anything it does not match. Blocked calls return an MCP error and are audited. |
+| Command audit logging | `WINBRIDGE_AUDIT_LOG` | Append-only JSONL: principal, role, tool, decision (allowed/blocked), command, cwd, session, exit code, duration. |
+| Windows credential login (dedicated service account) | `scripts/install-service.ps1 -ServiceAccount ".\winbridge" -ServiceAccountPassword $pw` | Runs the service under a specific Windows account instead of LocalSystem. |
+| Windows service installer | `npm run service:install` / `scripts/install-service.ps1` | Registers WinBridge as an auto-start Windows service via NSSM. `scripts/uninstall-service.ps1` removes it. |
+
+Policy evaluation order: a command must pass the **global** policy and then the **caller's principal** policy. Either can reject it.
 
 ## Not Yet Implemented
 
-- TLS termination inside the app
-- mTLS
-- per-user authorization
-- command allowlists or denylists
-- Windows credential login
-- Windows service installer
+- Request-level Windows Integrated Authentication (Negotiate/NTLM/Kerberos over HTTP). This needs native SSPI bindings; request auth is handled by bearer tokens and, optionally, mTLS client certificates. The `-ServiceAccount` installer option covers running *as* a Windows credential.
+- Rate limiting / per-principal quotas.
+- Automatic token rotation (rotate manually and update clients).

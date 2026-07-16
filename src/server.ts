@@ -1,7 +1,8 @@
 import { pathToFileURL } from "node:url";
 import type { AppConfig } from "./config.js";
-import { loadConfig } from "./config.js";
+import { loadConfig, shortestTokenLength } from "./config.js";
 import { createWinBridgeApp } from "./mcpServer.js";
+import { createServerForApp } from "./tls.js";
 import { startCloudflareTunnel, type TunnelHandle } from "./tunnel.js";
 
 function printConnectionHelp(mcpUrl: string): void {
@@ -24,15 +25,25 @@ export async function main(): Promise<void> {
   const tunnelRequested = config.tunnel.enabled || process.argv.includes("--tunnel");
   const { app, sessions } = createWinBridgeApp(config);
 
-  const httpServer = app.listen(config.port, config.host, () => {
-    console.log(`WinBridge MCP listening at http://${config.host}:${config.port}${config.endpointPath}`);
+  const { server: httpServer, scheme } = createServerForApp(app, config.tls);
+  httpServer.listen(config.port, config.host, () => {
+    console.log(`WinBridge MCP listening at ${scheme}://${config.host}:${config.port}${config.endpointPath}`);
+    if (config.tls?.clientCaPath) {
+      console.log("Mutual TLS is enabled: clients must present a certificate trusted by the configured CA.");
+    }
   });
 
   let tunnel: TunnelHandle | undefined;
   if (tunnelRequested) {
-    if (config.authToken.length < 24) {
+    if (config.tls) {
       console.warn(
-        "Warning: WINBRIDGE_TOKEN is short. Tunnel mode exposes this remote-command server to the public " +
+        "Warning: tunnel mode terminates TLS at Cloudflare and forwards to WinBridge over loopback. " +
+          "In-app TLS/mTLS is not applied to tunnel traffic; rely on the bearer token over the tunnel."
+      );
+    }
+    if (shortestTokenLength(config.principals) < 24) {
+      console.warn(
+        "Warning: a WinBridge token is short. Tunnel mode exposes this remote-command server to the public " +
           "internet (protected only by the bearer token). Use a long random token, e.g. 32+ characters."
       );
     }

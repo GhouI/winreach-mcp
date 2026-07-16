@@ -26,13 +26,16 @@
   "homepage": "https://github.com/GhouI/pendragon-mcp#readme",
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "start": "node dist/src/server.js",
     "dev": "tsx src/server.ts",
     "client": "tsx src/client.ts",
     "video:render": "remotion render video/index.ts WinBridgeDemo assets/winbridge-demo.mp4",
     "video:still": "remotion still video/index.ts WinBridgeDemo assets/winbridge-demo.png --frame=510",
     "test": "vitest run",
     "test:watch": "vitest",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "service:install": "powershell -ExecutionPolicy Bypass -File ./scripts/install-service.ps1",
+    "service:uninstall": "powershell -ExecutionPolicy Bypass -File ./scripts/uninstall-service.ps1"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.18.2",

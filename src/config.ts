@@ -1,4 +1,12 @@
 import type { TunnelProvider } from "./tunnel.js";
+import type { TlsConfig } from "./tls.js";
+import { compilePatterns, type CommandPolicy } from "./policy.js";
+import {
+  assertUniqueTokens,
+  createPrimaryPrincipal,
+  parsePrincipals,
+  type Principal
+} from "./principals.js";
 
 export type TunnelConfig = {
   enabled: boolean;
@@ -13,7 +21,14 @@ export type AppConfig = {
   host: string;
   port: number;
   endpointPath: string;
-  authToken: string;
+  /** Authenticated identities. Always contains at least one principal. */
+  principals: Principal[];
+  /** Deployment-wide command policy applied to every principal. */
+  globalPolicy: CommandPolicy;
+  /** Path to the JSONL audit log, or undefined to disable auditing. */
+  auditLogPath?: string;
+  /** In-app TLS/mTLS settings, or undefined for plain HTTP. */
+  tls?: TlsConfig;
   allowedOrigins: string[];
   shellPath?: string;
   defaultCwd: string;
@@ -64,6 +79,37 @@ function readListEnv(name: string): string[] {
     .filter(Boolean);
 }
 
+/**
+ * Read a list of regex patterns. Accepts either a JSON array (use this when a
+ * pattern itself contains commas, e.g. `\d{1,3}`) or a plain comma-separated
+ * list for simple cases.
+ */
+function readPatternListEnv(name: string): string[] {
+  const raw = readEnv(name)?.trim();
+  if (!raw) {
+    return [];
+  }
+
+  if (raw.startsWith("[")) {
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      throw new Error(`WINBRIDGE_${name} must be valid JSON: ${detail}`);
+    }
+    if (!Array.isArray(parsed) || parsed.some((item) => typeof item !== "string")) {
+      throw new Error(`WINBRIDGE_${name} JSON must be an array of strings`);
+    }
+    return (parsed as string[]).map((value) => value.trim()).filter(Boolean);
+  }
+
+  return raw
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
 function readBoolEnv(name: string, fallback: boolean): boolean {
   const raw = readEnv(name);
   if (raw === undefined || raw.trim() === "") {
@@ -89,11 +135,67 @@ function loadTunnelConfig(): TunnelConfig {
   };
 }
 
-export function loadConfig(): AppConfig {
-  const authToken = readEnv("TOKEN");
-  if (!authToken) {
-    throw new Error("WINBRIDGE_TOKEN is required");
+function loadGlobalPolicy(): CommandPolicy {
+  return {
+    allow: compilePatterns(readPatternListEnv("COMMAND_ALLOWLIST"), "WINBRIDGE_COMMAND_ALLOWLIST"),
+    deny: compilePatterns(readPatternListEnv("COMMAND_DENYLIST"), "WINBRIDGE_COMMAND_DENYLIST")
+  };
+}
+
+function loadTlsConfig(): TlsConfig | undefined {
+  const certPath = readEnv("TLS_CERT")?.trim();
+  const keyPath = readEnv("TLS_KEY")?.trim();
+  const clientCaPath = readEnv("TLS_CLIENT_CA")?.trim();
+  const passphrase = readEnv("TLS_KEY_PASSPHRASE");
+
+  if (!certPath && !keyPath) {
+    if (clientCaPath) {
+      throw new Error("WINBRIDGE_TLS_CLIENT_CA requires WINBRIDGE_TLS_CERT and WINBRIDGE_TLS_KEY (mTLS needs TLS).");
+    }
+    return undefined;
   }
+
+  if (!certPath || !keyPath) {
+    throw new Error("Both WINBRIDGE_TLS_CERT and WINBRIDGE_TLS_KEY must be set to enable TLS.");
+  }
+
+  return {
+    certPath,
+    keyPath,
+    passphrase: passphrase || undefined,
+    clientCaPath: clientCaPath || undefined
+  };
+}
+
+/**
+ * Build the principal list from the legacy single token and/or the
+ * WINBRIDGE_PRINCIPALS array. At least one principal is required.
+ */
+function loadPrincipals(): Principal[] {
+  const principals: Principal[] = [];
+
+  const token = readEnv("TOKEN");
+  if (token) {
+    // The legacy single token is a full-access admin; the global policy still
+    // applies to it. Its per-principal policy is empty (unrestricted).
+    principals.push(createPrimaryPrincipal(token, { allow: [], deny: [] }));
+  }
+
+  const principalsJson = readEnv("PRINCIPALS")?.trim();
+  if (principalsJson) {
+    principals.push(...parsePrincipals(principalsJson, process.env));
+  }
+
+  if (principals.length === 0) {
+    throw new Error("WINBRIDGE_TOKEN or WINBRIDGE_PRINCIPALS is required");
+  }
+
+  assertUniqueTokens(principals);
+  return principals;
+}
+
+export function loadConfig(): AppConfig {
+  const globalPolicy = loadGlobalPolicy();
 
   return {
     name: "winbridge-mcp",
@@ -101,7 +203,10 @@ export function loadConfig(): AppConfig {
     host: readEnv("HOST") ?? "127.0.0.1",
     port: readNumberEnv("PORT", DEFAULT_PORT),
     endpointPath: readEnv("ENDPOINT_PATH") ?? "/mcp",
-    authToken,
+    principals: loadPrincipals(),
+    globalPolicy,
+    auditLogPath: readEnv("AUDIT_LOG")?.trim() || undefined,
+    tls: loadTlsConfig(),
     allowedOrigins: readListEnv("ALLOWED_ORIGINS"),
     shellPath: readEnv("SHELL_PATH"),
     defaultCwd: readEnv("CWD") ?? process.cwd(),
@@ -109,4 +214,9 @@ export function loadConfig(): AppConfig {
     maxOutputBytes: readNumberEnv("MAX_OUTPUT_BYTES", DEFAULT_MAX_OUTPUT_BYTES),
     tunnel: loadTunnelConfig()
   };
+}
+
+/** The shortest principal token length, used for weak-token warnings. */
+export function shortestTokenLength(principals: Principal[]): number {
+  return principals.reduce((min, principal) => Math.min(min, principal.token.length), Infinity);
 }
