@@ -4,15 +4,33 @@
 
 import {
   DEFAULT_CONFIG,
+  ROLE_PRESETS,
+  generateToken,
   parseList,
+  type AuthMode,
   type WinBridgeConfig,
+  type WinBridgeUser,
 } from "@/lib/winbridge-config";
+
+/** A user as edited in the wizard: allow/deny stay raw strings until generation. */
+export type FormUser = {
+  id: string;
+  name: string;
+  role: string;
+  token: string;
+  allTools: boolean;
+  tools: string[];
+  allow: string;
+  deny: string;
+};
 
 export type FormState = {
   host: string;
   port: string;
   endpointPath: string;
+  authMode: AuthMode;
   token: string;
+  users: FormUser[];
   allowedOrigins: string;
   screenshotEnabled: boolean;
   screenshotRoles: string;
@@ -29,11 +47,28 @@ export type FormState = {
   tunnel: boolean;
 };
 
+/** A fresh user seeded from the "admin" preset with a generated token. */
+export function newUser(name = ""): FormUser {
+  const preset = ROLE_PRESETS.admin;
+  return {
+    id: crypto.randomUUID(),
+    name,
+    role: "admin",
+    token: generateToken(),
+    allTools: preset.allTools,
+    tools: [...preset.tools],
+    allow: preset.allow.join("\n"),
+    deny: preset.deny.join("\n"),
+  };
+}
+
 export const INITIAL: FormState = {
   host: DEFAULT_CONFIG.host,
   port: String(DEFAULT_CONFIG.port),
   endpointPath: DEFAULT_CONFIG.endpointPath,
+  authMode: "single",
   token: "",
+  users: [],
   allowedOrigins: "",
   screenshotEnabled: false,
   screenshotRoles: "",
@@ -59,7 +94,18 @@ export function toConfig(f: FormState): WinBridgeConfig {
     host: f.host.trim() || "127.0.0.1",
     port: num(f.port, 7573),
     endpointPath: f.endpointPath.trim() || "/mcp",
+    authMode: f.authMode,
     token: f.token.trim(),
+    users: f.users.map((u) => ({
+      id: u.id,
+      name: u.name.trim(),
+      role: u.role,
+      token: u.token.trim(),
+      allTools: u.allTools,
+      tools: u.tools,
+      allow: parseList(u.allow),
+      deny: parseList(u.deny),
+    })),
     allowedOrigins: parseList(f.allowedOrigins),
     screenshot: {
       enabled: f.screenshotEnabled,
@@ -88,7 +134,18 @@ export function fromConfig(cfg: WinBridgeConfig): FormState {
     host: cfg.host,
     port: String(cfg.port),
     endpointPath: cfg.endpointPath,
+    authMode: cfg.authMode,
     token: cfg.token,
+    users: cfg.users.map((u) => ({
+      id: u.id || crypto.randomUUID(),
+      name: u.name,
+      role: u.role,
+      token: u.token,
+      allTools: u.allTools,
+      tools: u.tools,
+      allow: u.allow.join("\n"),
+      deny: u.deny.join("\n"),
+    })),
     allowedOrigins: cfg.allowedOrigins.join(", "),
     screenshotEnabled: cfg.screenshot.enabled,
     screenshotRoles: cfg.screenshot.roles.join(", "),
@@ -124,11 +181,29 @@ export function sanitizeConfig(raw: unknown): WinBridgeConfig {
   const policy = obj(r.policy);
   const tls = obj(r.tls);
 
+  const users: WinBridgeUser[] = Array.isArray(r.users)
+    ? r.users.map((rawUser) => {
+        const u = obj(rawUser);
+        return {
+          id: str(u.id, "") || crypto.randomUUID(),
+          name: str(u.name, ""),
+          role: str(u.role, "user"),
+          token: str(u.token, ""),
+          allTools: bool(u.allTools, true),
+          tools: list(u.tools),
+          allow: list(u.allow),
+          deny: list(u.deny),
+        };
+      })
+    : [];
+
   return {
     host: str(r.host, d.host).trim() || d.host,
     port: num(r.port, d.port),
     endpointPath: str(r.endpointPath, d.endpointPath).trim() || d.endpointPath,
+    authMode: r.authMode === "users" ? "users" : "single",
     token: str(r.token, d.token),
+    users,
     allowedOrigins: list(r.allowedOrigins),
     screenshot: {
       enabled: bool(shot.enabled, d.screenshot.enabled),

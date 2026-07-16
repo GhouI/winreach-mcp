@@ -6,6 +6,7 @@ import {
   buildCodexConfig,
   buildFirewallRule,
   buildPowerShellEnv,
+  buildPrincipalsJson,
   buildStartScript,
   connectUrl,
   generateToken,
@@ -20,6 +21,7 @@ import {
 } from "@/lib/form-state";
 import type { StoredConfig } from "@/lib/config-store";
 import { Field, Grid, Section, TextArea, TextInput, Toggle, Warn } from "@/components/ui";
+import { UsersEditor } from "@/components/users-editor";
 import { OutputPanel } from "@/components/output-panel";
 import { Stepper } from "@/components/stepper";
 import {
@@ -47,16 +49,16 @@ export default function Home() {
 
   const cfg = useMemo(() => toConfig(form), [form]);
 
-  const tabs = useMemo(
-    () => ({
-      "Env (PowerShell)": buildPowerShellEnv(cfg),
-      "start.ps1": buildStartScript(cfg),
-      Firewall: buildFirewallRule(cfg),
-      "Claude Code": buildClaudeConfig(cfg),
-      Codex: buildCodexConfig(cfg),
-    }),
-    [cfg],
-  );
+  const tabs = useMemo(() => {
+    const t: Record<string, string> = {};
+    t["Env (PowerShell)"] = buildPowerShellEnv(cfg);
+    if (cfg.authMode === "users") t["Principals"] = buildPrincipalsJson(cfg);
+    t["start.ps1"] = buildStartScript(cfg);
+    t["Firewall"] = buildFirewallRule(cfg);
+    t["Claude Code"] = buildClaudeConfig(cfg);
+    t["Codex"] = buildCodexConfig(cfg);
+    return t;
+  }, [cfg]);
 
   const tlsIncomplete =
     (!!form.certPath.trim() || !!form.keyPath.trim()) &&
@@ -65,8 +67,10 @@ export default function Home() {
   const exposedNoIps =
     form.host.trim() === "0.0.0.0" && parseList(form.allowedIps).length === 0;
 
+  const usersNoneYet = form.authMode === "users" && form.users.length === 0;
   const flaggedSteps = [
     ...(exposedNoIps ? [0] : []),
+    ...(usersNoneYet ? [1] : []),
     ...(tlsIncomplete ? [2] : []),
     ...(fileEnabledNoRoot ? [3] : []),
   ];
@@ -210,21 +214,49 @@ export default function Home() {
               <Section
                 icon={<KeyIcon className="size-4" />}
                 title="Authentication & access"
-                desc="Bearer token and who may reach the server."
+                desc="How agents authenticate, and who may reach the server."
               >
-                <Field label="Bearer token (WINBRIDGE_TOKEN)" hint="Required. Use a long random value.">
-                  <div className="flex gap-2">
-                    <TextInput value={form.token} onChange={(v) => set("token", v)} placeholder="click Generate" mono />
-                    <button
-                      type="button"
-                      onClick={() => set("token", generateToken())}
-                      className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-accent px-3.5 text-sm font-medium text-accent-fg shadow-sm transition hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
-                    >
-                      <SparklesIcon className="size-3.5" />
-                      Generate
-                    </button>
+                <Field label="Auth model" asDiv>
+                  <div className="flex flex-wrap gap-2">
+                    <ModeButton
+                      active={form.authMode === "single"}
+                      onClick={() => set("authMode", "single")}
+                      title="Single admin token"
+                      desc="One shared WINBRIDGE_TOKEN"
+                    />
+                    <ModeButton
+                      active={form.authMode === "users"}
+                      onClick={() => set("authMode", "users")}
+                      title="Multiple users"
+                      desc="Per-user keys, roles & tools"
+                    />
                   </div>
                 </Field>
+
+                {form.authMode === "single" ? (
+                  <Field label="Bearer token (WINBRIDGE_TOKEN)" hint="Required. Use a long random value.">
+                    <div className="flex gap-2">
+                      <TextInput value={form.token} onChange={(v) => set("token", v)} placeholder="click Generate" mono />
+                      <button
+                        type="button"
+                        onClick={() => set("token", generateToken())}
+                        className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg bg-accent px-3.5 text-sm font-medium text-accent-fg shadow-sm transition hover:bg-accent-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+                      >
+                        <SparklesIcon className="size-3.5" />
+                        Generate
+                      </button>
+                    </div>
+                  </Field>
+                ) : (
+                  <Field
+                    label="Users"
+                    hint="Each user becomes a WINBRIDGE_PRINCIPALS entry with its own key, role, and tool/command limits."
+                    asDiv
+                  >
+                    <UsersEditor users={form.users} onChange={(users) => set("users", users)} />
+                  </Field>
+                )}
+
                 <Field
                   label="Allowed source IPs / CIDRs"
                   hint="Corporate ranges, comma or newline separated. Used for the firewall rule."
@@ -353,8 +385,14 @@ export default function Home() {
                     />
                     <SummaryRow label="Cloudflare tunnel" value={cfg.tunnel ? "Enabled" : "Off"} />
                     <SummaryRow
-                      label="Bearer token"
-                      value={form.token.trim() ? `Set (${form.token.trim().length} chars)` : "Not set — see the Access stage"}
+                      label="Access model"
+                      value={
+                        cfg.authMode === "users"
+                          ? `${cfg.users.length} user${cfg.users.length === 1 ? "" : "s"} (per-user keys)`
+                          : form.token.trim()
+                            ? `Single token (${form.token.trim().length} chars)`
+                            : "Single token — not set"
+                      }
                     />
                     <SummaryRow
                       label="Firewall scope"
@@ -489,6 +527,36 @@ export default function Home() {
         </div>
       </footer>
     </div>
+  );
+}
+
+/* ----------------------------- Auth mode button --------------------------- */
+
+function ModeButton({
+  active,
+  onClick,
+  title,
+  desc,
+}: {
+  active: boolean;
+  onClick: () => void;
+  title: string;
+  desc: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`min-w-[170px] flex-1 rounded-xl border px-4 py-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
+        active
+          ? "border-accent bg-accent/8 shadow-xs"
+          : "border-border bg-surface hover:bg-surface-muted"
+      }`}
+    >
+      <span className="block text-sm font-medium">{title}</span>
+      <span className="mt-0.5 block text-xs text-muted">{desc}</span>
+    </button>
   );
 }
 

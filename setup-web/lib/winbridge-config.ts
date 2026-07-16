@@ -2,11 +2,57 @@
 // firewall rules, and agent-connect snippets. No React / DOM here so this stays
 // easy to reason about and test.
 
+/** Every MCP tool a principal can be granted. */
+export const TOOL_NAMES = [
+  "powershell_execute",
+  "powershell_open_session",
+  "powershell_send",
+  "powershell_close_session",
+  "powershell_list_sessions",
+  "take_screenshot",
+  "file_upload",
+  "file_download",
+] as const;
+export type ToolName = (typeof TOOL_NAMES)[number];
+
+export type AuthMode = "single" | "users";
+
+/** A per-user identity that becomes one WINBRIDGE_PRINCIPALS entry. */
+export type WinBridgeUser = {
+  id: string; // UI key only; never emitted to config
+  name: string;
+  role: string;
+  token: string;
+  /** true = the key may use every tool (omit `tools`); false = restrict to `tools`. */
+  allTools: boolean;
+  tools: string[];
+  allow: string[];
+  deny: string[];
+};
+
+/** Role presets applied when a role is chosen (still editable afterward). */
+export const ROLE_PRESETS: Record<
+  string,
+  { allTools: boolean; tools: string[]; allow: string[]; deny: string[] }
+> = {
+  admin: { allTools: true, tools: [], allow: [], deny: [] },
+  operator: {
+    allTools: true,
+    tools: [],
+    allow: [],
+    deny: ["Remove-Item", "Format-Volume", "Stop-Computer", "Stop-Service"],
+  },
+  readonly: { allTools: false, tools: ["powershell_execute"], allow: ["^Get-", "^Test-"], deny: [] },
+  custom: { allTools: true, tools: [], allow: [], deny: [] },
+};
+
 export type WinBridgeConfig = {
   host: string;
   port: number;
   endpointPath: string;
+  authMode: AuthMode;
   token: string;
+  users: WinBridgeUser[];
   allowedOrigins: string[];
   screenshot: {
     enabled: boolean;
@@ -35,7 +81,9 @@ export const DEFAULT_CONFIG: WinBridgeConfig = {
   host: "127.0.0.1",
   port: 7573,
   endpointPath: "/mcp",
+  authMode: "single",
   token: "",
+  users: [],
   allowedOrigins: [],
   screenshot: { enabled: false, roles: [], retentionHours: 8 },
   fileTransfer: { enabled: false, root: "", maxBytesMB: 75 },
@@ -55,22 +103,28 @@ export function parseList(raw: string): string[] {
     .filter(Boolean);
 }
 
-/** A cryptographically-random hex token for WINBRIDGE_TOKEN (browser only). */
+/** A cryptographically-random hex token for a bearer key (browser only). */
 export function generateToken(bytes = 32): string {
   const buf = new Uint8Array(bytes);
   crypto.getRandomValues(buf);
   return Array.from(buf, (b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-/** The WINBRIDGE_* environment variables implied by the config, in a stable order. */
+/**
+ * The scalar WINBRIDGE_* environment variables implied by the config. The auth
+ * variable is handled separately: WINBRIDGE_TOKEN here in single mode, and
+ * WINBRIDGE_PRINCIPALS (a here-string) added by buildPowerShellEnv in users mode.
+ */
 export function buildEnvVars(cfg: WinBridgeConfig): EnvVar[] {
   const env: EnvVar[] = [];
   const push = (name: string, value: string | number | undefined) => {
-    if (value === undefined || value === "" ) return;
+    if (value === undefined || value === "") return;
     env.push({ name, value: String(value) });
   };
 
-  push("WINBRIDGE_TOKEN", cfg.token || "REPLACE_WITH_A_LONG_RANDOM_TOKEN");
+  if (cfg.authMode !== "users") {
+    push("WINBRIDGE_TOKEN", cfg.token || "REPLACE_WITH_A_LONG_RANDOM_TOKEN");
+  }
   push("WINBRIDGE_HOST", cfg.host);
   push("WINBRIDGE_PORT", cfg.port);
   if (cfg.endpointPath && cfg.endpointPath !== "/mcp") push("WINBRIDGE_ENDPOINT_PATH", cfg.endpointPath);
@@ -108,11 +162,34 @@ function psQuote(value: string): string {
   return `"${value.replace(/`/g, "``").replace(/"/g, '`"')}"`;
 }
 
-/** PowerShell `$env:NAME = "value"` lines. */
+/** The WINBRIDGE_PRINCIPALS JSON array (pretty-printed) for the configured users. */
+export function buildPrincipalsJson(cfg: WinBridgeConfig): string {
+  const entries = cfg.users.map((u) => {
+    const entry: Record<string, unknown> = {
+      name: u.name.trim() || "user",
+      role: u.role || "user",
+      token: u.token || "REPLACE_WITH_A_TOKEN",
+    };
+    if (u.allow.length) entry.allow = u.allow;
+    if (u.deny.length) entry.deny = u.deny;
+    // `tools` is only emitted when it is a real restriction; omitting it means all tools.
+    if (!u.allTools) entry.tools = u.tools;
+    return entry;
+  });
+  return JSON.stringify(entries, null, 2);
+}
+
+/** PowerShell env block: WINBRIDGE_TOKEN or WINBRIDGE_PRINCIPALS, then the scalars. */
 export function buildPowerShellEnv(cfg: WinBridgeConfig): string {
-  return buildEnvVars(cfg)
-    .map((e) => `$env:${e.name} = ${psQuote(e.value)}`)
-    .join("\n");
+  const lines: string[] = [];
+  if (cfg.authMode === "users") {
+    // Here-string: the closing '@ must sit at column 0.
+    lines.push(`$env:WINBRIDGE_PRINCIPALS = @'\n${buildPrincipalsJson(cfg)}\n'@`);
+  }
+  for (const e of buildEnvVars(cfg)) {
+    lines.push(`$env:${e.name} = ${psQuote(e.value)}`);
+  }
+  return lines.join("\n");
 }
 
 const scheme = (cfg: WinBridgeConfig) => (cfg.tls.certPath && cfg.tls.keyPath ? "https" : "http");
@@ -162,21 +239,42 @@ export function buildFirewallRule(cfg: WinBridgeConfig): string {
   );
 }
 
-/** `claude mcp add` command for Claude Code. */
+/** `claude mcp add` command(s) for Claude Code — per-user tokens in users mode. */
 export function buildClaudeConfig(cfg: WinBridgeConfig): string {
+  const url = connectUrl(cfg);
+  if (cfg.authMode === "users") {
+    if (!cfg.users.length) {
+      return "# Add users in the Access stage to generate per-user connect commands.";
+    }
+    return cfg.users
+      .map((u) => {
+        const name = u.name.trim() || "user";
+        const token = u.token || "<token>";
+        return (
+          `# ${name} (${u.role})\n` +
+          `claude mcp add --transport http winbridge-${name} ${url} \`\n` +
+          `  --header "Authorization: Bearer ${token}"`
+        );
+      })
+      .join("\n\n");
+  }
   return (
-    `claude mcp add --transport http winbridge ${connectUrl(cfg)} \`\n` +
+    `claude mcp add --transport http winbridge ${url} \`\n` +
     `  --header "Authorization: Bearer $env:WINBRIDGE_TOKEN"`
   );
 }
 
 /** `~/.codex/config.toml` block for Codex. */
 export function buildCodexConfig(cfg: WinBridgeConfig): string {
-  return [
+  const lines = [
     "[mcp_servers.winbridge]",
     `url = "${connectUrl(cfg)}"`,
     'bearer_token_env_var = "WINBRIDGE_TOKEN"',
     "tool_timeout_sec = 120",
     "enabled = true",
-  ].join("\n");
+  ];
+  if (cfg.authMode === "users") {
+    lines.push("", "# In multi-user mode each user connects with their own token (see Claude Code tab).");
+  }
+  return lines.join("\n");
 }
