@@ -28,3 +28,25 @@ export type SessionInfo = {
   lastUsedAt: string;
   cwd: string;
 };
+
+export type ScreenshotFormat = "png" | "jpeg";
+
+export type ScreenshotOptions = {
+  format?: ScreenshotFormat;
+  path?: string;
+  timeoutMs?: number;
+};
+
+export type ScreenshotResult = {
+  commandId: string;
+  success: boolean;
+  format: ScreenshotFormat;
+  mimeType: string;
+  width: number | null;
+  height: number | null;
+  bytes: number;
+  base64: string;
+  path?: string;
+  durationMs: number;
+  error?: string;
+};

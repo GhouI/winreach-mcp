@@ -40,7 +40,7 @@ Most coding agents are comfortable in terminals, but Windows RDP is a GUI-first 
 
 ## Tooling
 
-WinBridge exposes five MCP tools:
+WinBridge exposes six MCP tools:
 
 | Tool | Purpose |
 | --- | --- |
@@ -49,6 +49,7 @@ WinBridge exposes five MCP tools:
 | `powershell_send` | Send a command to a persistent session. |
 | `powershell_close_session` | Close a persistent session. |
 | `powershell_list_sessions` | List active sessions. |
+| `take_screenshot` | Capture the current screen of the Windows host as an image. |
 
 Command results include:
 
@@ -62,6 +63,27 @@ Command results include:
   "truncated": false
 }
 ```
+
+`take_screenshot` captures the full virtual desktop (all monitors) and returns an
+MCP image block (base64 PNG by default, `jpeg` optional) alongside a metadata
+block:
+
+```json
+{
+  "commandId": "uuid",
+  "success": true,
+  "format": "png",
+  "mimeType": "image/png",
+  "width": 1920,
+  "height": 1080,
+  "bytes": 82344,
+  "durationMs": 96
+}
+```
+
+Screen capture needs an active interactive desktop session. If WinBridge runs in
+a non-interactive service context (Windows session 0), the capture fails and the
+tool returns `success: false` with the PowerShell error instead of an image.
 
 ## Quickstart
 

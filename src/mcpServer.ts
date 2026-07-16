@@ -10,8 +10,9 @@ import { createAuditLogger, type AuditLogger } from "./audit.js";
 import { evaluatePolicies } from "./policy.js";
 import type { Principal } from "./principals.js";
 import { executePowerShell } from "./powershell/shell.js";
+import { captureScreenshot } from "./powershell/screenshot.js";
 import { PowerShellSessionManager } from "./powershell/session.js";
-import type { PowerShellResult } from "./powershell/types.js";
+import type { PowerShellResult, ScreenshotResult } from "./powershell/types.js";
 
 const commandInputSchema = {
   command: z.string().min(1).describe("PowerShell command to execute"),
@@ -107,6 +108,18 @@ async function auditResult(
     durationMs: result.durationMs
   });
 }
+
+const screenshotInputSchema = {
+  format: z
+    .enum(["png", "jpeg"])
+    .optional()
+    .describe("Image format for the capture. Defaults to png."),
+  path: z
+    .string()
+    .optional()
+    .describe("Optional path on the Windows host to also save the image to. When omitted, a temp file is used and removed after capture."),
+  timeoutMs: z.number().positive().optional().describe("Capture timeout in milliseconds")
+};
 
 export function createWinBridgeMcpServer(
   config: AppConfig,
@@ -224,6 +237,29 @@ export function createWinBridgeMcpServer(
     async () => jsonToolResult({ sessions: sessions.list() })
   );
 
+  server.registerTool(
+    "take_screenshot",
+    {
+      title: "Take Screenshot",
+      description:
+        "Capture the current screen of the Windows host as a PNG or JPEG image. Captures the full virtual desktop across all monitors. Requires an active interactive desktop session.",
+      inputSchema: screenshotInputSchema
+    },
+    async (args) => {
+      const result = await captureScreenshot(config, args);
+      await audit.log({
+        time: new Date().toISOString(),
+        principal: principal.name,
+        role: principal.role,
+        tool: "take_screenshot",
+        decision: result.success ? "allowed" : "error",
+        durationMs: result.durationMs,
+        reason: result.success ? undefined : result.error
+      });
+      return screenshotToolResult(result);
+    }
+  );
+
   return server;
 }
 
@@ -305,6 +341,44 @@ function jsonToolResult(value: unknown) {
       {
         type: "text" as const,
         text: JSON.stringify(value, null, 2)
+      }
+    ]
+  };
+}
+
+function screenshotToolResult(result: ScreenshotResult) {
+  if (!result.success) {
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: JSON.stringify(
+            {
+              commandId: result.commandId,
+              success: false,
+              durationMs: result.durationMs,
+              error: result.error ?? "Screen capture failed."
+            },
+            null,
+            2
+          )
+        }
+      ],
+      isError: true
+    };
+  }
+
+  const { base64, ...metadata } = result;
+  return {
+    content: [
+      {
+        type: "image" as const,
+        data: base64,
+        mimeType: result.mimeType
+      },
+      {
+        type: "text" as const,
+        text: JSON.stringify(metadata, null, 2)
       }
     ]
   };
