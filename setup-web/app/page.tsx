@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import {
   buildClaudeConfig,
   buildCodexConfig,
@@ -37,6 +38,7 @@ import {
   SlidersIcon,
   SparklesIcon,
   TerminalIcon,
+  UsersIcon,
 } from "@/components/icons";
 
 const STEP_TITLES = ["Server", "Access", "Security", "Tools", "Policy", "Review"];
@@ -149,9 +151,18 @@ export default function Home() {
               Config generator
             </span>
           </div>
-          <div className="flex shrink-0 items-center gap-1.5 text-xs text-muted">
-            <LockIcon className="size-3.5" />
-            <span className="hidden sm:inline">Generated in your browser</span>
+          <div className="flex shrink-0 items-center gap-3 text-xs text-muted">
+            <Link
+              href="/admin"
+              className="inline-flex items-center gap-1.5 rounded-md border border-border bg-surface px-2.5 py-1 font-medium transition hover:bg-surface-muted"
+            >
+              <UsersIcon className="size-3.5" />
+              Accounts
+            </Link>
+            <span className="hidden items-center gap-1.5 sm:flex">
+              <LockIcon className="size-3.5" />
+              Generated in your browser
+            </span>
           </div>
         </div>
       </header>

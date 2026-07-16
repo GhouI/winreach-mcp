@@ -9,6 +9,9 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: dirname(fileURLToPath(import.meta.url)),
   },
+  // Database drivers are loaded via dynamic import() in the store adapters and
+  // must stay external (Node require) rather than being bundled.
+  serverExternalPackages: ["pg", "mysql2", "mongodb"],
 };
 
 export default nextConfig;
