@@ -154,10 +154,13 @@ export function uploadFile(runtime: FileTransferRuntime, options: FileUploadOpti
     if (typeof options.content !== "string") {
       return failure("content must be a base64-encoded string.");
     }
-    // Reject oversize input from the encoded length before allocating the
-    // decoded buffer (base64 encodes ~3 bytes per 4 chars), so a huge payload
-    // cannot force a large allocation just to be rejected afterwards.
-    if (Math.floor(options.content.length / 4) * 3 > runtime.maxBytes) {
+    // Cheap DoS guard: reject clearly-oversize input from the encoded length
+    // before allocating the decoded buffer. base64 encodes ~3 bytes per 4 chars;
+    // the `- 3` slack keeps this pre-check from ever firing for a file that is
+    // actually within the limit (the exact post-decode check below handles the
+    // precise boundary), which also avoids off-by-a-few over-rejection when
+    // maxBytes is not a multiple of 3.
+    if (Math.floor(options.content.length / 4) * 3 - 3 > runtime.maxBytes) {
       return failure(`File exceeds the ${runtime.maxBytes}-byte limit.`);
     }
     buffer = Buffer.from(options.content, "base64");
@@ -167,7 +170,8 @@ export function uploadFile(runtime: FileTransferRuntime, options: FileUploadOpti
 
     const { absolute, relative: rel } = resolveWithinRoot(root, options.path, false);
 
-    if (existsSync(absolute)) {
+    const overwritten = existsSync(absolute);
+    if (overwritten) {
       if (statSync(absolute).isDirectory()) {
         return failure("Destination is a directory.");
       }
@@ -176,7 +180,6 @@ export function uploadFile(runtime: FileTransferRuntime, options: FileUploadOpti
       }
     }
 
-    const overwritten = existsSync(absolute);
     mkdirSync(dirname(absolute), { recursive: true });
     writeFileSync(absolute, buffer);
 

@@ -375,18 +375,25 @@ export function createWinBridgeMcpServer(
  * The SDK helper hardcodes body-parser's 100 kB default, which would reject
  * uploads far below `WINBRIDGE_MAX_FILE_BYTES` with an opaque HTTP 413.
  */
-function createMcpApp(config: AppConfig) {
+/** JSON body limit, sized to fit a base64-encoded file_upload plus the envelope. */
+function jsonBodyLimitBytes(config: AppConfig): number {
   const DEFAULT_JSON_LIMIT = 100 * 1024;
   const ENVELOPE_OVERHEAD = 64 * 1024;
   // base64 inflates by ~4/3; add slack for the JSON-RPC envelope.
   const uploadLimit = config.fileTransfer.enabled
     ? Math.ceil(config.fileTransfer.maxBytes * 4 / 3) + ENVELOPE_OVERHEAD
     : 0;
-  const limit = Math.max(DEFAULT_JSON_LIMIT, uploadLimit);
+  return Math.max(DEFAULT_JSON_LIMIT, uploadLimit);
+}
 
+/**
+ * Build the base Express app with localhost DNS-rebinding protection (mirroring
+ * the SDK's createMcpExpressApp). Body parsing is intentionally NOT added here:
+ * it is mounted after auth in createWinBridgeApp so an unauthenticated client
+ * cannot make the server buffer and parse a large (up to ~maxBytes*4/3) body.
+ */
+function createMcpApp(config: AppConfig) {
   const app = express();
-  app.use(express.json({ limit }));
-
   const localhostHosts = ["127.0.0.1", "localhost", "::1"];
   if (localhostHosts.includes(config.host)) {
     app.use(localhostHostValidation());
@@ -407,7 +414,12 @@ export function createWinBridgeApp(config: AppConfig) {
   app.use(createOriginGuard(config.allowedOrigins));
   app.use(config.endpointPath, createPrincipalAuthMiddleware(config.principals));
 
-  app.post(config.endpointPath, async (req: Request, res: Response) => {
+  // Parse the JSON body only after auth has passed, and only on the MCP POST
+  // route, so an unauthenticated or wrong-path request is never buffered/parsed
+  // up to the (large) upload limit.
+  const parseJsonBody = express.json({ limit: jsonBodyLimitBytes(config) });
+
+  app.post(config.endpointPath, parseJsonBody, async (req: Request, res: Response) => {
     const principal = getRequestPrincipal(res);
     if (!principal) {
       // Should never happen: the auth middleware rejects unauthenticated requests.

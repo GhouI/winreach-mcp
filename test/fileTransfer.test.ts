@@ -124,6 +124,24 @@ describe("uploadFile", () => {
     expect(existsSync(join(root, "big.txt"))).toBe(false);
   });
 
+  it("accepts a file exactly at a non-multiple-of-3 cap and rejects one byte over", () => {
+    const root = makeRoot();
+    const cap = 1000; // not divisible by 3 — exercises the pre-decode guard slack
+    const atCap = uploadFile(runtime(root, cap), {
+      path: "at.bin",
+      content: Buffer.alloc(cap, 1).toString("base64")
+    });
+    expect(atCap.success).toBe(true);
+    expect(atCap.bytes).toBe(cap);
+
+    const overCap = uploadFile(runtime(root, cap), {
+      path: "over.bin",
+      content: Buffer.alloc(cap + 1, 1).toString("base64")
+    });
+    expect(overCap.success).toBe(false);
+    expect(overCap.error).toMatch(/limit/i);
+  });
+
   it("rejects traversal paths", () => {
     const root = makeRoot();
     const result = uploadFile(runtime(root), { path: "../evil.txt", content: b64("x") });

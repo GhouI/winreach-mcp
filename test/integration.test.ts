@@ -113,6 +113,24 @@ describe("HTTP bearer auth + guards", () => {
     const getMethod = await fetch(base, { method: "GET", headers: { authorization: "Bearer admin-token" } });
     expect(getMethod.status).toBe(405);
   });
+
+  it("rejects an oversized unauthenticated body with 401, not 413 (auth runs before body parsing)", async () => {
+    // File transfer disabled here, so the JSON body limit is the 100 kB default.
+    const { app } = createWinBridgeApp(makeConfig());
+    const { server } = createServerForApp(app, undefined);
+    const port = await listen(server);
+
+    // A 200 kB body exceeds the 100 kB parser limit. If body parsing ran before
+    // auth (the old global express.json), this would be 413; with parsing behind
+    // auth, an unauthenticated request is 401 and the body is never parsed.
+    const big = "x".repeat(200 * 1024);
+    const res = await fetch(`http://127.0.0.1:${port}/mcp`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping", params: { pad: big } })
+    });
+    expect(res.status).toBe(401);
+  });
 });
 
 const describeTls = tlsFixtures ? describe : describe.skip;
