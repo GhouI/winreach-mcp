@@ -255,6 +255,10 @@ Restrict your cloud firewall so TCP `7573` is reachable only from trusted IP add
 
 ## Configuration
 
+Prefer a UI? The [`setup-web`](setup-web/) app (Next.js) generates the env vars,
+a `start.ps1`, a Windows firewall rule for your allowed IPs, and agent-connect
+snippets from a form — see [setup-web/README.md](setup-web/README.md).
+
 WinBridge reads `WINBRIDGE_*` variables. The legacy `PENDRAGON_*` names are still accepted as aliases; `WINBRIDGE_*` wins when both are set.
 
 | Variable | Default | Description |
