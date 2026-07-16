@@ -34,3 +34,12 @@ export function CheckIcon({ className }: IconProps) {
     </svg>
   );
 }
+
+/** Disclosure chevron (points right; rotate with CSS when open). */
+export function ChevronIcon({ className }: IconProps) {
+  return (
+    <svg {...base(className)}>
+      <path d="m9 6 6 6-6 6" />
+    </svg>
+  );
+}

@@ -24,12 +24,27 @@ export function Section({
   title,
   desc,
   children,
+  frameless,
 }: {
   eyebrow?: string;
   title: string;
   desc?: string;
   children: React.ReactNode;
+  /**
+   * Render without the card chrome (border/header). Used when the section is
+   * embedded in a container that already carries its title — e.g. an expanded
+   * onboarding checklist item.
+   */
+  frameless?: boolean;
 }) {
+  if (frameless) {
+    return (
+      <section aria-label={title}>
+        {desc && <p className="mb-5 max-w-prose text-[13px] leading-relaxed text-muted">{desc}</p>}
+        <div className="space-y-6">{children}</div>
+      </section>
+    );
+  }
   return (
     <section className="rounded-lg border border-border bg-surface">
       <header className="border-b border-border px-6 py-5">

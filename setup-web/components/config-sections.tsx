@@ -15,6 +15,8 @@ type SectionProps = {
   form: FormState;
   set: SetField;
   eyebrow?: string;
+  /** Drop the card chrome — the parent (e.g. a checklist item) carries the title. */
+  frameless?: boolean;
 };
 
 /** Derived validation flags used by sections, the stage rail, and review. */
@@ -32,11 +34,12 @@ export function formWarnings(form: FormState) {
 
 /* ------------------------------ 01 · Server ------------------------------- */
 
-export function ServerSection({ form, set, eyebrow }: SectionProps) {
+export function ServerSection({ form, set, eyebrow, frameless }: SectionProps) {
   const { exposedNoIps } = formWarnings(form);
   return (
     <Section
       eyebrow={eyebrow}
+      frameless={frameless}
       title="Server"
       desc="Where WinBridge binds, its endpoint, and which networks may reach it."
     >
@@ -81,11 +84,12 @@ export function ServerSection({ form, set, eyebrow }: SectionProps) {
 
 /* ----------------------------- 02 · Security ------------------------------ */
 
-export function SecuritySection({ form, set, eyebrow }: SectionProps) {
+export function SecuritySection({ form, set, eyebrow, frameless }: SectionProps) {
   const { tlsIncomplete } = formWarnings(form);
   return (
     <Section
       eyebrow={eyebrow}
+      frameless={frameless}
       title="TLS / mTLS"
       desc="Serve HTTPS in-app (optional). mTLS additionally requires a client CA."
     >
@@ -107,11 +111,12 @@ export function SecuritySection({ form, set, eyebrow }: SectionProps) {
 
 /* ------------------------------- 03 · Tools ------------------------------- */
 
-export function ToolsSection({ form, set, eyebrow }: SectionProps) {
+export function ToolsSection({ form, set, eyebrow, frameless }: SectionProps) {
   const { fileEnabledNoRoot } = formWarnings(form);
   return (
     <Section
       eyebrow={eyebrow}
+      frameless={frameless}
       title="Tools"
       desc="powershell_* tools are always on. These extra tools are opt-in."
     >
@@ -163,10 +168,11 @@ export function ToolsSection({ form, set, eyebrow }: SectionProps) {
 
 /* ------------------------------ 04 · Policy ------------------------------- */
 
-export function PolicySection({ form, set, eyebrow }: SectionProps) {
+export function PolicySection({ form, set, eyebrow, frameless }: SectionProps) {
   return (
     <Section
       eyebrow={eyebrow}
+      frameless={frameless}
       title="Command policy"
       desc="Regex allow/deny for powershell_execute and sessions. Deny wins."
     >
@@ -184,10 +190,11 @@ export function PolicySection({ form, set, eyebrow }: SectionProps) {
 
 /* ------------------------------ 05 · Access ------------------------------- */
 
-export function AccessSection({ form, set, eyebrow }: SectionProps) {
+export function AccessSection({ form, set, eyebrow, frameless }: SectionProps) {
   return (
     <Section
       eyebrow={eyebrow}
+      frameless={frameless}
       title="Authentication"
       desc="How agents authenticate against the server."
     >
