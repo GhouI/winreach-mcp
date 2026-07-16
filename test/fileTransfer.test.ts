@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -53,6 +53,19 @@ describe("resolveWithinRoot", () => {
   it("rejects an empty path", () => {
     const root = makeRoot();
     expect(() => resolveWithinRoot(root, "   ", false)).toThrow(/required/i);
+  });
+
+  it("rejects Windows absolute and drive-relative escapes", () => {
+    if (process.platform !== "win32") {
+      return;
+    }
+    const root = makeRoot();
+    for (const bad of ["C:\\Windows\\System32", "\\\\server\\share\\x", "\\\\?\\C:\\x", "\\\\.\\C:\\x"]) {
+      expect(() => resolveWithinRoot(root, bad, false)).toThrow();
+    }
+    // Cross-drive drive-relative (e.g. "D:evil") resolves off-root and must be rejected.
+    const otherDrive = root.toUpperCase().startsWith("C:") ? "D:evil" : "C:evil";
+    expect(() => resolveWithinRoot(root, otherDrive, false)).toThrow(/escapes|relative/i);
   });
 
   it("rejects a symlink that escapes the root", () => {
@@ -152,10 +165,12 @@ describe("downloadFile", () => {
     expect(result.error).toMatch(/not found/i);
   });
 
-  it("refuses a directory", () => {
+  it("refuses to download a directory", () => {
     const root = makeRoot();
-    const result = downloadFile(runtime(root), { path: "." });
+    mkdirSync(join(root, "sub"));
+    const result = downloadFile(runtime(root), { path: "sub" });
     expect(result.success).toBe(false);
+    expect(result.error).toMatch(/directory/i);
   });
 
   it("enforces the size cap", () => {

@@ -125,6 +125,20 @@ function sha256(buffer: Buffer): string {
 }
 
 /**
+ * Convert a caught error into a client-safe message. Intentional
+ * `FileTransferError` messages are returned as-is; any other error (e.g. a raw
+ * Node fs error, which embeds the absolute server path) is logged server-side
+ * and replaced with a generic message so filesystem layout is not disclosed.
+ */
+function describeError(error: unknown): string {
+  if (error instanceof FileTransferError) {
+    return error.message;
+  }
+  console.error("File transfer failed:", error);
+  return "File operation failed.";
+}
+
+/**
  * Write a base64-encoded file into the sandbox root. Creates parent directories
  * as needed (within the root). Refuses to overwrite unless `overwrite` is set,
  * and refuses content larger than `maxBytes`.
@@ -139,6 +153,12 @@ export function uploadFile(runtime: FileTransferRuntime, options: FileUploadOpti
 
     if (typeof options.content !== "string") {
       return failure("content must be a base64-encoded string.");
+    }
+    // Reject oversize input from the encoded length before allocating the
+    // decoded buffer (base64 encodes ~3 bytes per 4 chars), so a huge payload
+    // cannot force a large allocation just to be rejected afterwards.
+    if (Math.floor(options.content.length / 4) * 3 > runtime.maxBytes) {
+      return failure(`File exceeds the ${runtime.maxBytes}-byte limit.`);
     }
     buffer = Buffer.from(options.content, "base64");
     if (buffer.length > runtime.maxBytes) {
@@ -170,7 +190,7 @@ export function uploadFile(runtime: FileTransferRuntime, options: FileUploadOpti
       overwritten
     };
   } catch (error) {
-    return failure(error instanceof Error ? error.message : String(error));
+    return failure(describeError(error));
   }
 }
 
@@ -214,7 +234,7 @@ export function downloadFile(runtime: FileTransferRuntime, options: FileDownload
       deleted
     };
   } catch (error) {
-    return failure(error instanceof Error ? error.message : String(error));
+    return failure(describeError(error));
   }
 }
 

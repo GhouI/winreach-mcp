@@ -6,6 +6,7 @@ import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { createAuditLogger } from "../src/audit.js";
 import { compilePatterns } from "../src/policy.js";
 import { createPrimaryPrincipal, parsePrincipals, type Principal } from "../src/principals.js";
@@ -308,5 +309,42 @@ describe("file transfer gating", () => {
     const names = await listToolNames(config, admin());
     expect(names).toContain("file_upload");
     expect(names).toContain("file_download");
+  });
+
+  // Regression guard for the JSON body limit: over HTTP the SDK's default 100 kB
+  // body-parser limit would 413 an upload well below WINBRIDGE_MAX_FILE_BYTES.
+  it("uploads and downloads a file larger than 100 kB over HTTP", async () => {
+    const root = mkdtempSync(join(tmpdir(), "winbridge-http-ft-"));
+    cleanups.push(() => rmSync(root, { recursive: true, force: true }));
+    const config = makeConfig({ fileTransfer: { enabled: true, root, maxBytes: 50 * 1024 * 1024 } });
+
+    const { app } = createWinBridgeApp(config);
+    const { server } = createServerForApp(app, undefined);
+    const port = await listen(server);
+
+    const client = new Client({ name: "test-client", version: "0.0.0" });
+    await client.connect(
+      new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${port}/mcp`), {
+        requestInit: { headers: { Authorization: "Bearer admin-token" } }
+      })
+    );
+    cleanups.push(() => void client.close());
+
+    const payload = Buffer.alloc(300 * 1024, 7); // 300 kB, ~400 kB base64
+    const up = (await client.callTool({
+      name: "file_upload",
+      arguments: { path: "large.bin", content: payload.toString("base64") }
+    })) as { content: Array<{ text: string }> };
+    const upResult = JSON.parse(up.content[0].text) as { success: boolean; bytes: number };
+    expect(upResult.success).toBe(true);
+    expect(upResult.bytes).toBe(payload.length);
+
+    const down = (await client.callTool({
+      name: "file_download",
+      arguments: { path: "large.bin" }
+    })) as { content: Array<{ text: string }> };
+    const downResult = JSON.parse(down.content[0].text) as { success: boolean; base64: string };
+    expect(downResult.success).toBe(true);
+    expect(Buffer.from(downResult.base64, "base64").equals(payload)).toBe(true);
   });
 });

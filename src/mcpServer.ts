@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js";
+import { localhostHostValidation } from "@modelcontextprotocol/sdk/server/middleware/hostHeaderValidation.js";
+import express from "express";
 import * as z from "zod/v4";
 import type { Request, Response } from "express";
 import { createOriginGuard, createPrincipalAuthMiddleware, getRequestPrincipal } from "./auth.js";
@@ -320,13 +321,16 @@ export function createWinBridgeMcpServer(
       },
       async (args) => {
         const result = uploadFile(fileRuntime, args);
+        // Record the caller-supplied (relative) path on both success and
+        // failure so a rejected traversal/escape probe is visible in the log
+        // and distinguishable from a normal transfer.
         await audit.log({
           time: new Date().toISOString(),
           principal: principal.name,
           role: principal.role,
           tool: "file_upload",
-          decision: "allowed",
-          path: result.path,
+          decision: result.success ? "allowed" : "blocked",
+          path: result.relativePath ?? args.path,
           bytes: result.success ? result.bytes : undefined,
           reason: result.success ? undefined : result.error
         });
@@ -351,8 +355,8 @@ export function createWinBridgeMcpServer(
           principal: principal.name,
           role: principal.role,
           tool: "file_download",
-          decision: "allowed",
-          path: result.path,
+          decision: result.success ? "allowed" : "blocked",
+          path: result.relativePath ?? args.path,
           bytes: result.success ? result.bytes : undefined,
           reason: result.success ? undefined : result.error
         });
@@ -364,10 +368,41 @@ export function createWinBridgeMcpServer(
   return server;
 }
 
+/**
+ * Build the Express app for the MCP endpoint. This mirrors the SDK's
+ * `createMcpExpressApp` (JSON body parsing + localhost DNS-rebinding protection)
+ * but sizes the JSON body limit to fit a base64-encoded `file_upload` payload.
+ * The SDK helper hardcodes body-parser's 100 kB default, which would reject
+ * uploads far below `WINBRIDGE_MAX_FILE_BYTES` with an opaque HTTP 413.
+ */
+function createMcpApp(config: AppConfig) {
+  const DEFAULT_JSON_LIMIT = 100 * 1024;
+  const ENVELOPE_OVERHEAD = 64 * 1024;
+  // base64 inflates by ~4/3; add slack for the JSON-RPC envelope.
+  const uploadLimit = config.fileTransfer.enabled
+    ? Math.ceil(config.fileTransfer.maxBytes * 4 / 3) + ENVELOPE_OVERHEAD
+    : 0;
+  const limit = Math.max(DEFAULT_JSON_LIMIT, uploadLimit);
+
+  const app = express();
+  app.use(express.json({ limit }));
+
+  const localhostHosts = ["127.0.0.1", "localhost", "::1"];
+  if (localhostHosts.includes(config.host)) {
+    app.use(localhostHostValidation());
+  } else if (config.host === "0.0.0.0" || config.host === "::") {
+    console.warn(
+      `Warning: Server is binding to ${config.host} without DNS rebinding protection. ` +
+        "Restrict access with a firewall, WINBRIDGE_ALLOWED_ORIGINS, or a tunnel."
+    );
+  }
+  return app;
+}
+
 export function createWinBridgeApp(config: AppConfig) {
   const sessions = new PowerShellSessionManager(config);
   const audit = createAuditLogger(config.auditLogPath);
-  const app = createMcpExpressApp({ host: config.host });
+  const app = createMcpApp(config);
 
   app.use(createOriginGuard(config.allowedOrigins));
   app.use(config.endpointPath, createPrincipalAuthMiddleware(config.principals));
