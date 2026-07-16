@@ -260,7 +260,7 @@ WinBridge reads `WINBRIDGE_*` variables. The legacy `PENDRAGON_*` names are stil
 | Variable | Default | Description |
 | --- | --- | --- |
 | `WINBRIDGE_TOKEN` | required* | Bearer token for a single full-access admin. *Required unless `WINBRIDGE_PRINCIPALS` is set. |
-| `WINBRIDGE_PRINCIPALS` | empty | JSON array of per-user principals: `[{"name","role","token"\|"tokenEnv","allow":[],"deny":[]}]`. Enables per-user authorization. |
+| `WINBRIDGE_PRINCIPALS` | empty | JSON array of per-user principals: `[{"name","role","token"\|"tokenEnv","allow":[],"deny":[],"tools":[]}]`. Enables per-user authorization. `tools` optionally limits a principal to specific tool names (omit for all). |
 | `WINBRIDGE_COMMAND_ALLOWLIST` | empty | Regex allowlist (comma-separated or JSON array). If non-empty, only matching commands run. |
 | `WINBRIDGE_COMMAND_DENYLIST` | empty | Regex denylist (comma-separated or JSON array). Matching commands are blocked; deny wins over allow. |
 | `WINBRIDGE_AUDIT_LOG` | empty | Path to an append-only JSONL audit log of every tool call. |
@@ -324,7 +324,8 @@ $env:WINBRIDGE_PRINCIPALS = @'
 [
   { "name": "ci",    "role": "admin",    "tokenEnv": "CI_TOKEN" },
   { "name": "agent", "role": "readonly", "tokenEnv": "AGENT_TOKEN",
-    "allow": ["^Get-", "^Test-"], "deny": ["Remove-Item", "Stop-Service"] }
+    "allow": ["^Get-", "^Test-"], "deny": ["Remove-Item", "Stop-Service"],
+    "tools": ["powershell_execute"] }
 ]
 '@
 ```

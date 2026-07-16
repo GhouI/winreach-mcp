@@ -168,110 +168,126 @@ export function createWinBridgeMcpServer(
       "Use powershell_open_session, powershell_send, and powershell_close_session when state must persist across commands, such as variables, imported modules, or working directory.",
       "Commands run as the operating system user that launched WinBridge.",
       "Command allow/deny policies may block some commands; blocked calls return an error explaining why.",
+      "A principal may also be limited to a subset of tools; tools it cannot use are simply not offered.",
       "Treat every tool call as remote command execution and avoid sending secrets unless the operator explicitly intends that."
     ].join(" ")
   });
 
-  server.registerTool(
-    "powershell_execute",
-    {
-      title: "Execute PowerShell",
-      description: "Run a one-shot headless PowerShell command.",
-      inputSchema: commandInputSchema
-    },
-    async (args) => {
-      const blocked = await enforcePolicy(config, principal, audit, "powershell_execute", args.command, args.cwd);
-      if (blocked) {
-        return blocked;
+  // A principal with a `tools` allowlist only sees the tools it lists; without
+  // one it sees every tool (subject to the per-tool gates below).
+  const allowsTool = (tool: string): boolean =>
+    principal.tools === undefined || principal.tools.includes(tool);
+
+  if (allowsTool("powershell_execute")) {
+    server.registerTool(
+      "powershell_execute",
+      {
+        title: "Execute PowerShell",
+        description: "Run a one-shot headless PowerShell command.",
+        inputSchema: commandInputSchema
+      },
+      async (args) => {
+        const blocked = await enforcePolicy(config, principal, audit, "powershell_execute", args.command, args.cwd);
+        if (blocked) {
+          return blocked;
+        }
+        const result = await executePowerShell(config, args);
+        await auditResult(audit, principal, "powershell_execute", result, args.command, args.cwd);
+        return jsonToolResult(result);
       }
-      const result = await executePowerShell(config, args);
-      await auditResult(audit, principal, "powershell_execute", result, args.command, args.cwd);
-      return jsonToolResult(result);
-    }
-  );
+    );
+  }
 
-  server.registerTool(
-    "powershell_open_session",
-    {
-      title: "Open PowerShell Session",
-      description: "Open a persistent headless PowerShell session.",
-      inputSchema: openSessionInputSchema
-    },
-    async (args) => {
-      const info = sessions.open(args.cwd, args.env);
-      await audit.log({
-        time: new Date().toISOString(),
-        principal: principal.name,
-        role: principal.role,
-        tool: "powershell_open_session",
-        decision: "allowed",
-        cwd: args.cwd,
-        sessionId: info.sessionId
-      });
-      return jsonToolResult(info);
-    }
-  );
-
-  server.registerTool(
-    "powershell_send",
-    {
-      title: "Send PowerShell Session Command",
-      description: "Send a command to a persistent PowerShell session.",
-      inputSchema: sendInputSchema
-    },
-    async ({ sessionId, ...args }) => {
-      const blocked = await enforcePolicy(
-        config,
-        principal,
-        audit,
-        "powershell_send",
-        args.command,
-        args.cwd,
-        sessionId
-      );
-      if (blocked) {
-        return blocked;
+  if (allowsTool("powershell_open_session")) {
+    server.registerTool(
+      "powershell_open_session",
+      {
+        title: "Open PowerShell Session",
+        description: "Open a persistent headless PowerShell session.",
+        inputSchema: openSessionInputSchema
+      },
+      async (args) => {
+        const info = sessions.open(args.cwd, args.env);
+        await audit.log({
+          time: new Date().toISOString(),
+          principal: principal.name,
+          role: principal.role,
+          tool: "powershell_open_session",
+          decision: "allowed",
+          cwd: args.cwd,
+          sessionId: info.sessionId
+        });
+        return jsonToolResult(info);
       }
-      const result = await sessions.send(sessionId, args);
-      await auditResult(audit, principal, "powershell_send", result, args.command, args.cwd, sessionId);
-      return jsonToolResult(result);
-    }
-  );
+    );
+  }
 
-  server.registerTool(
-    "powershell_close_session",
-    {
-      title: "Close PowerShell Session",
-      description: "Close a persistent PowerShell session.",
-      inputSchema: closeInputSchema
-    },
+  if (allowsTool("powershell_send")) {
+    server.registerTool(
+      "powershell_send",
+      {
+        title: "Send PowerShell Session Command",
+        description: "Send a command to a persistent PowerShell session.",
+        inputSchema: sendInputSchema
+      },
+      async ({ sessionId, ...args }) => {
+        const blocked = await enforcePolicy(
+          config,
+          principal,
+          audit,
+          "powershell_send",
+          args.command,
+          args.cwd,
+          sessionId
+        );
+        if (blocked) {
+          return blocked;
+        }
+        const result = await sessions.send(sessionId, args);
+        await auditResult(audit, principal, "powershell_send", result, args.command, args.cwd, sessionId);
+        return jsonToolResult(result);
+      }
+    );
+  }
+
+  if (allowsTool("powershell_close_session")) {
+    server.registerTool(
+      "powershell_close_session",
+      {
+        title: "Close PowerShell Session",
+        description: "Close a persistent PowerShell session.",
+        inputSchema: closeInputSchema
+      },
     async ({ sessionId }) => {
-      const closed = sessions.close(sessionId);
-      await audit.log({
-        time: new Date().toISOString(),
-        principal: principal.name,
-        role: principal.role,
-        tool: "powershell_close_session",
-        decision: "allowed",
-        sessionId
-      });
-      return jsonToolResult({ sessionId, closed });
-    }
-  );
+        const closed = sessions.close(sessionId);
+        await audit.log({
+          time: new Date().toISOString(),
+          principal: principal.name,
+          role: principal.role,
+          tool: "powershell_close_session",
+          decision: "allowed",
+          sessionId
+        });
+        return jsonToolResult({ sessionId, closed });
+      }
+    );
+  }
 
-  server.registerTool(
-    "powershell_list_sessions",
-    {
-      title: "List PowerShell Sessions",
-      description: "List active persistent PowerShell sessions."
-    },
-    async () => jsonToolResult({ sessions: sessions.list() })
-  );
+  if (allowsTool("powershell_list_sessions")) {
+    server.registerTool(
+      "powershell_list_sessions",
+      {
+        title: "List PowerShell Sessions",
+        description: "List active persistent PowerShell sessions."
+      },
+      async () => jsonToolResult({ sessions: sessions.list() })
+    );
+  }
 
   // Screen capture is a read/exfiltration capability, so it is only exposed when
   // the operator has enabled it (WINBRIDGE_ALLOW_SCREENSHOT) for a role that
-  // includes this principal.
-  if (isScreenshotAllowed(config, principal)) {
+  // includes this principal — and only if the principal's tool allowlist permits it.
+  if (isScreenshotAllowed(config, principal) && allowsTool("take_screenshot")) {
     server.registerTool(
       "take_screenshot",
       {
@@ -311,6 +327,7 @@ export function createWinBridgeMcpServer(
   if (config.fileTransfer.enabled) {
     const fileRuntime = { root: config.fileTransfer.root, maxBytes: config.fileTransfer.maxBytes };
 
+    if (allowsTool("file_upload"))
     server.registerTool(
       "file_upload",
       {
@@ -340,6 +357,7 @@ export function createWinBridgeMcpServer(
       }
     );
 
+    if (allowsTool("file_download"))
     server.registerTool(
       "file_download",
       {
