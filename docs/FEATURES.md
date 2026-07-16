@@ -194,6 +194,13 @@ this when both are configured).
 
 Set `WINBRIDGE_AUDIT_LOG` to a file path to record every tool call as append-only
 [JSONL](https://jsonlines.org/) (one JSON object per line), implemented in [`src/audit.ts`](../src/audit.ts).
+Enable it before starting the server:
+
+```powershell
+$env:WINBRIDGE_AUDIT_LOG = "C:\logs\winbridge-audit.jsonl"
+npm run dev
+```
+
 Each entry can include:
 
 | Field | Meaning |
@@ -213,6 +220,34 @@ Each entry can include:
 Writes are serialized through an internal promise chain so concurrent tool calls cannot interleave partial
 lines, the target directory is created automatically, and a write failure is reported once to stderr rather
 than crashing the request. When `WINBRIDGE_AUDIT_LOG` is unset, a no-op logger is used.
+
+A completed command and a policy-blocked command look like this (one object per line, shown formatted here):
+
+```json
+{ "time": "2026-07-16T12:00:00.000Z", "principal": "agent", "role": "readonly",
+  "tool": "powershell_execute", "decision": "allowed",
+  "command": "Get-Process", "exitCode": 0, "durationMs": 143 }
+```
+
+```json
+{ "time": "2026-07-16T12:01:00.000Z", "principal": "agent", "role": "readonly",
+  "tool": "powershell_execute", "decision": "blocked",
+  "command": "Remove-Item C:\\data -Recurse",
+  "reason": "Command blocked by agent denylist" }
+```
+
+Because it is plain JSONL, the log is easy to tail, grep, or ship to a SIEM. To review activity ad hoc, read
+the file and filter on `decision`. For example, to list every blocked call:
+
+```powershell
+Get-Content C:\logs\winbridge-audit.jsonl |
+  ForEach-Object { $_ | ConvertFrom-Json } |
+  Where-Object { $_.decision -eq "blocked" } |
+  Select-Object time, principal, tool, command, reason
+```
+
+Note that `blocked` entries record the `reason`; the finer-grained `matchedRule` (`source:pattern`) is returned
+to the caller in the tool error but is not written to the audit log.
 
 ### Origin guard and DNS-rebinding protection
 
