@@ -6,6 +6,7 @@ import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import { createAuditLogger } from "../src/audit.js";
 import { compilePatterns } from "../src/policy.js";
 import { createPrimaryPrincipal, parsePrincipals, type Principal } from "../src/principals.js";
@@ -34,6 +35,7 @@ function makeConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     principals: [createPrimaryPrincipal("admin-token", { allow: [], deny: [] })],
     globalPolicy: { allow: [], deny: compilePatterns(["Remove-Item", "Format-Volume"], "deny") },
     screenshot: { enabled: false, allowedRoles: [], dir: join(tmpdir(), "winbridge-shots-test"), retentionMs: 0 },
+    fileTransfer: { enabled: false, maxBytes: 50 * 1024 * 1024 },
     allowedOrigins: [],
     defaultCwd: process.cwd(),
     defaultTimeoutMs: 5000,
@@ -110,6 +112,24 @@ describe("HTTP bearer auth + guards", () => {
 
     const getMethod = await fetch(base, { method: "GET", headers: { authorization: "Bearer admin-token" } });
     expect(getMethod.status).toBe(405);
+  });
+
+  it("rejects an oversized unauthenticated body with 401, not 413 (auth runs before body parsing)", async () => {
+    // File transfer disabled here, so the JSON body limit is the 100 kB default.
+    const { app } = createWinBridgeApp(makeConfig());
+    const { server } = createServerForApp(app, undefined);
+    const port = await listen(server);
+
+    // A 200 kB body exceeds the 100 kB parser limit. If body parsing ran before
+    // auth (the old global express.json), this would be 413; with parsing behind
+    // auth, an unauthenticated request is 401 and the body is never parsed.
+    const big = "x".repeat(200 * 1024);
+    const res = await fetch(`http://127.0.0.1:${port}/mcp`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping", params: { pad: big } })
+    });
+    expect(res.status).toBe(401);
   });
 });
 
@@ -272,5 +292,80 @@ describe("take_screenshot gating", () => {
   it("does not register the tool when the principal's role is not permitted", async () => {
     const names = await listToolNames(makeConfig({ screenshot: screenshot(true, ["operator"]) }), admin());
     expect(names).not.toContain("take_screenshot");
+  });
+});
+
+describe("file transfer gating", () => {
+  async function listToolNames(config: AppConfig, principal: Principal): Promise<string[]> {
+    const sessions = new PowerShellSessionManager(config);
+    const audit = createAuditLogger(undefined);
+    const server = createWinBridgeMcpServer(config, sessions, principal, audit);
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: "test-client", version: "0.0.0" });
+    await Promise.all([client.connect(clientTransport), server.connect(serverTransport)]);
+    cleanups.push(() => {
+      sessions.closeAll();
+      void client.close();
+      void server.close();
+    });
+    const { tools } = await client.listTools();
+    return tools.map((tool) => tool.name);
+  }
+
+  const admin = () => createPrimaryPrincipal("admin-token", { allow: [], deny: [] });
+
+  it("does not register the tools when no root is configured", async () => {
+    const names = await listToolNames(makeConfig(), admin());
+    expect(names).not.toContain("file_upload");
+    expect(names).not.toContain("file_download");
+  });
+
+  it("registers both tools when a root is configured", async () => {
+    const config = makeConfig({
+      fileTransfer: { enabled: true, root: join(tmpdir(), "winbridge-files-test"), maxBytes: 1024 }
+    });
+    const names = await listToolNames(config, admin());
+    expect(names).toContain("file_upload");
+    expect(names).toContain("file_download");
+  });
+
+  // Regression guard for the JSON body limit: over HTTP the SDK's default 100 kB
+  // body-parser limit would 413 an upload well below WINBRIDGE_MAX_FILE_BYTES.
+  it("uploads and downloads a file larger than 100 kB over HTTP", async () => {
+    const root = mkdtempSync(join(tmpdir(), "winbridge-http-ft-"));
+    cleanups.push(() => rmSync(root, { recursive: true, force: true }));
+    // 300 kB payload with the cap set exactly at its size: this exercises the
+    // body-limit envelope slack (a file AT the cap must pass the JSON parser)
+    // as well as the >100 kB body that the old 100 kB default would have 413'd.
+    const payload = Buffer.alloc(300 * 1024, 7); // ~400 kB base64
+    const config = makeConfig({ fileTransfer: { enabled: true, root, maxBytes: payload.length } });
+
+    const { app } = createWinBridgeApp(config);
+    const { server } = createServerForApp(app, undefined);
+    const port = await listen(server);
+
+    const client = new Client({ name: "test-client", version: "0.0.0" });
+    await client.connect(
+      new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${port}/mcp`), {
+        requestInit: { headers: { Authorization: "Bearer admin-token" } }
+      })
+    );
+    cleanups.push(() => void client.close());
+
+    const up = (await client.callTool({
+      name: "file_upload",
+      arguments: { path: "large.bin", content: payload.toString("base64") }
+    })) as { content: Array<{ text: string }> };
+    const upResult = JSON.parse(up.content[0].text) as { success: boolean; bytes: number };
+    expect(upResult.success).toBe(true);
+    expect(upResult.bytes).toBe(payload.length);
+
+    const down = (await client.callTool({
+      name: "file_download",
+      arguments: { path: "large.bin" }
+    })) as { content: Array<{ text: string }> };
+    const downResult = JSON.parse(down.content[0].text) as { success: boolean; base64: string };
+    expect(downResult.success).toBe(true);
+    expect(Buffer.from(downResult.base64, "base64").equals(payload)).toBe(true);
   });
 });

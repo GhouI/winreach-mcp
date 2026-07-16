@@ -1,7 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { createMcpExpressApp } from "@modelcontextprotocol/sdk/server/express.js";
+import { localhostHostValidation } from "@modelcontextprotocol/sdk/server/middleware/hostHeaderValidation.js";
+import express from "express";
 import * as z from "zod/v4";
 import type { Request, Response } from "express";
 import { createOriginGuard, createPrincipalAuthMiddleware, getRequestPrincipal } from "./auth.js";
@@ -13,6 +14,7 @@ import { executePowerShell } from "./powershell/shell.js";
 import { captureScreenshot } from "./powershell/screenshot.js";
 import { PowerShellSessionManager } from "./powershell/session.js";
 import type { PowerShellResult, ScreenshotResult } from "./powershell/types.js";
+import { downloadFile, uploadFile, type FileDownloadResult } from "./fileTransfer.js";
 
 const commandInputSchema = {
   command: z.string().min(1).describe("PowerShell command to execute"),
@@ -129,6 +131,26 @@ function isScreenshotAllowed(config: AppConfig, principal: Principal): boolean {
   const roles = config.screenshot.allowedRoles;
   return roles.length === 0 || roles.includes(principal.role);
 }
+
+const fileUploadInputSchema = {
+  path: z
+    .string()
+    .min(1)
+    .describe("Destination path, relative to the configured file root (WINBRIDGE_FILE_ROOT)."),
+  content: z.string().describe("File content, base64-encoded."),
+  overwrite: z.boolean().optional().describe("Overwrite an existing file. Defaults to false.")
+};
+
+const fileDownloadInputSchema = {
+  path: z
+    .string()
+    .min(1)
+    .describe("Source path, relative to the configured file root (WINBRIDGE_FILE_ROOT)."),
+  deleteSource: z
+    .boolean()
+    .optional()
+    .describe("Delete the source after a successful read, turning the copy into a move. Defaults to false.")
+};
 
 export function createWinBridgeMcpServer(
   config: AppConfig,
@@ -284,18 +306,119 @@ export function createWinBridgeMcpServer(
     );
   }
 
+  // File transfer is only exposed when the operator has configured a sandbox
+  // root; every path is then confined to that root.
+  if (config.fileTransfer.enabled) {
+    const fileRuntime = { root: config.fileTransfer.root, maxBytes: config.fileTransfer.maxBytes };
+
+    server.registerTool(
+      "file_upload",
+      {
+        title: "Upload File",
+        description:
+          "Write a base64-encoded file to the Windows host, inside the configured file root. Refuses to overwrite unless overwrite is set. Use this to put files on the server.",
+        inputSchema: fileUploadInputSchema
+      },
+      async (args) => {
+        const result = uploadFile(fileRuntime, args);
+        // Record the caller-supplied (relative) path on both success and
+        // failure so a rejected traversal/escape probe is visible in the log
+        // and distinguishable from a normal transfer.
+        await audit.log({
+          time: new Date().toISOString(),
+          principal: principal.name,
+          role: principal.role,
+          tool: "file_upload",
+          decision: result.success ? "allowed" : "blocked",
+          path: result.relativePath ?? args.path,
+          bytes: result.success ? result.bytes : undefined,
+          reason: result.success ? undefined : result.error
+        });
+        // Keep the server-side absolute path out of the client payload (audited).
+        const { path: _serverPath, ...payload } = result;
+        return jsonToolResult(payload, !result.success);
+      }
+    );
+
+    server.registerTool(
+      "file_download",
+      {
+        title: "Download File",
+        description:
+          "Read a file from the Windows host (inside the configured file root) and return it base64-encoded. Set deleteSource to move it (delete the server copy after a successful read).",
+        inputSchema: fileDownloadInputSchema
+      },
+      async (args) => {
+        const result = downloadFile(fileRuntime, args);
+        await audit.log({
+          time: new Date().toISOString(),
+          principal: principal.name,
+          role: principal.role,
+          tool: "file_download",
+          decision: result.success ? "allowed" : "blocked",
+          path: result.relativePath ?? args.path,
+          bytes: result.success ? result.bytes : undefined,
+          reason: result.success ? undefined : result.error
+        });
+        return fileDownloadToolResult(result);
+      }
+    );
+  }
+
   return server;
+}
+
+/**
+ * JSON body limit, sized to fit a base64-encoded `file_upload` payload plus the
+ * JSON-RPC envelope. The SDK's `createMcpExpressApp` hardcodes body-parser's
+ * 100 kB default, which would reject uploads far below `WINBRIDGE_MAX_FILE_BYTES`
+ * with an opaque HTTP 413; this is why we build the app (and mount the parser)
+ * ourselves.
+ */
+function jsonBodyLimitBytes(config: AppConfig): number {
+  const DEFAULT_JSON_LIMIT = 100 * 1024;
+  const ENVELOPE_OVERHEAD = 64 * 1024;
+  // base64 inflates by ~4/3; add slack for the JSON-RPC envelope.
+  const uploadLimit = config.fileTransfer.enabled
+    ? Math.ceil(config.fileTransfer.maxBytes * 4 / 3) + ENVELOPE_OVERHEAD
+    : 0;
+  return Math.max(DEFAULT_JSON_LIMIT, uploadLimit);
+}
+
+/**
+ * Build the base Express app with localhost DNS-rebinding protection (mirroring
+ * the SDK's createMcpExpressApp). Body parsing is intentionally NOT added here:
+ * it is mounted after auth in createWinBridgeApp so an unauthenticated client
+ * cannot make the server buffer and parse a large (up to ~maxBytes*4/3) body.
+ */
+function createMcpApp(config: AppConfig) {
+  const app = express();
+  const localhostHosts = ["127.0.0.1", "localhost", "::1"];
+  if (localhostHosts.includes(config.host)) {
+    app.use(localhostHostValidation());
+  } else if (config.host === "0.0.0.0" || config.host === "::") {
+    console.warn(
+      `Warning: Server is binding to ${config.host} without DNS rebinding protection. ` +
+        "Restrict access with a firewall, WINBRIDGE_ALLOWED_ORIGINS, or a tunnel."
+    );
+  }
+  return app;
 }
 
 export function createWinBridgeApp(config: AppConfig) {
   const sessions = new PowerShellSessionManager(config);
   const audit = createAuditLogger(config.auditLogPath);
-  const app = createMcpExpressApp({ host: config.host });
+  const app = createMcpApp(config);
 
   app.use(createOriginGuard(config.allowedOrigins));
   app.use(config.endpointPath, createPrincipalAuthMiddleware(config.principals));
 
-  app.post(config.endpointPath, async (req: Request, res: Response) => {
+  // Parse the JSON body only after auth has passed, and only on the MCP POST
+  // route, so an unauthenticated or wrong-path request is never buffered/parsed
+  // up to the (large) upload limit.
+  const parseJsonBody = express.json({ limit: jsonBodyLimitBytes(config) });
+
+  app.post(config.endpointPath, parseJsonBody, async (req: Request, res: Response) => {
     const principal = getRequestPrincipal(res);
     if (!principal) {
       // Should never happen: the auth middleware rejects unauthenticated requests.
@@ -359,15 +482,32 @@ export function createWinBridgeApp(config: AppConfig) {
   return { app, sessions, audit };
 }
 
-function jsonToolResult(value: unknown) {
+function jsonToolResult(value: unknown, isError = false) {
   return {
     content: [
       {
         type: "text" as const,
         text: JSON.stringify(value, null, 2)
       }
-    ]
+    ],
+    ...(isError ? { isError: true as const } : {})
   };
+}
+
+/**
+ * Format a file download. The server-side absolute path is stripped from the
+ * client-facing payload (it is kept in the audit log); the base64 content is the
+ * payload the caller needs, so it is returned.
+ */
+function fileDownloadToolResult(result: FileDownloadResult) {
+  if (!result.success) {
+    return jsonToolResult(
+      { commandId: result.commandId, success: false, error: result.error ?? "Download failed." },
+      true
+    );
+  }
+  const { path: _serverPath, ...payload } = result;
+  return jsonToolResult(payload);
 }
 
 function screenshotToolResult(result: ScreenshotResult) {
