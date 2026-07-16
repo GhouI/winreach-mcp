@@ -145,6 +145,8 @@ Notes:
 
 Full setup guide: [Install WinBridge and Connect Agents](docs/INSTALL_AND_AGENT_USAGE.md)
 
+Feature overview: [WinBridge Features](docs/FEATURES.md)
+
 Codex `~/.codex/config.toml`:
 
 ```toml
