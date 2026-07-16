@@ -1,6 +1,6 @@
 # WinBridge MCP
 
-[![CI](https://github.com/GhouI/pendragon-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/GhouI/pendragon-mcp/actions/workflows/ci.yml)
+[![CI](https://github.com/GhouI/winbridge-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/GhouI/winbridge-mcp/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![MCP](https://img.shields.io/badge/MCP-Streamable%20HTTP-blue)](https://modelcontextprotocol.io)
 [![Windows](https://img.shields.io/badge/Windows-PowerShell-5391FE)](https://learn.microsoft.com/powershell/)
@@ -130,8 +130,8 @@ Requirements:
 Run WinBridge locally:
 
 ```powershell
-git clone https://github.com/GhouI/pendragon-mcp.git
-cd pendragon-mcp
+git clone https://github.com/GhouI/winbridge-mcp.git
+cd winbridge-mcp
 npm install
 $env:WINBRIDGE_TOKEN = "dev-token"
 npm run dev
@@ -231,8 +231,8 @@ Also see:
 On the Windows host:
 
 ```powershell
-git clone https://github.com/GhouI/pendragon-mcp.git
-cd pendragon-mcp
+git clone https://github.com/GhouI/winbridge-mcp.git
+cd winbridge-mcp
 npm install
 $env:WINBRIDGE_TOKEN = "replace-with-a-long-random-token"
 $env:WINBRIDGE_HOST = "0.0.0.0"

@@ -7,8 +7,8 @@ WinBridge is a remote MCP server for headless PowerShell on Windows hosts. Agent
 Install Node.js 24 or newer, then run:
 
 ```powershell
-git clone https://github.com/GhouI/pendragon-mcp.git
-cd pendragon-mcp
+git clone https://github.com/GhouI/winbridge-mcp.git
+cd winbridge-mcp
 npm install
 npm run typecheck
 npm test
@@ -59,8 +59,8 @@ Caveats:
 Clone the repo locally or use another MCP client:
 
 ```powershell
-git clone https://github.com/GhouI/pendragon-mcp.git
-cd pendragon-mcp
+git clone https://github.com/GhouI/winbridge-mcp.git
+cd winbridge-mcp
 npm install
 $env:WINBRIDGE_URL = "http://WINDOWS_SERVER_IP:7573/mcp"
 $env:WINBRIDGE_TOKEN = "same-token-used-on-the-server"

@@ -18,12 +18,12 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/GhouI/pendragon-mcp.git"
+    "url": "git+https://github.com/GhouI/winbridge-mcp.git"
   },
   "bugs": {
-    "url": "https://github.com/GhouI/pendragon-mcp/issues"
+    "url": "https://github.com/GhouI/winbridge-mcp/issues"
   },
-  "homepage": "https://github.com/GhouI/pendragon-mcp#readme",
+  "homepage": "https://github.com/GhouI/winbridge-mcp#readme",
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "start": "node dist/src/server.js",
