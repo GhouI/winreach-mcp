@@ -334,7 +334,11 @@ describe("file transfer gating", () => {
   it("uploads and downloads a file larger than 100 kB over HTTP", async () => {
     const root = mkdtempSync(join(tmpdir(), "winbridge-http-ft-"));
     cleanups.push(() => rmSync(root, { recursive: true, force: true }));
-    const config = makeConfig({ fileTransfer: { enabled: true, root, maxBytes: 50 * 1024 * 1024 } });
+    // 300 kB payload with the cap set exactly at its size: this exercises the
+    // body-limit envelope slack (a file AT the cap must pass the JSON parser)
+    // as well as the >100 kB body that the old 100 kB default would have 413'd.
+    const payload = Buffer.alloc(300 * 1024, 7); // ~400 kB base64
+    const config = makeConfig({ fileTransfer: { enabled: true, root, maxBytes: payload.length } });
 
     const { app } = createWinBridgeApp(config);
     const { server } = createServerForApp(app, undefined);
@@ -348,7 +352,6 @@ describe("file transfer gating", () => {
     );
     cleanups.push(() => void client.close());
 
-    const payload = Buffer.alloc(300 * 1024, 7); // 300 kB, ~400 kB base64
     const up = (await client.callTool({
       name: "file_upload",
       arguments: { path: "large.bin", content: payload.toString("base64") }

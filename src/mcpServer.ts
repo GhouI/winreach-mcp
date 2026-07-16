@@ -369,13 +369,12 @@ export function createWinBridgeMcpServer(
 }
 
 /**
- * Build the Express app for the MCP endpoint. This mirrors the SDK's
- * `createMcpExpressApp` (JSON body parsing + localhost DNS-rebinding protection)
- * but sizes the JSON body limit to fit a base64-encoded `file_upload` payload.
- * The SDK helper hardcodes body-parser's 100 kB default, which would reject
- * uploads far below `WINBRIDGE_MAX_FILE_BYTES` with an opaque HTTP 413.
+ * JSON body limit, sized to fit a base64-encoded `file_upload` payload plus the
+ * JSON-RPC envelope. The SDK's `createMcpExpressApp` hardcodes body-parser's
+ * 100 kB default, which would reject uploads far below `WINBRIDGE_MAX_FILE_BYTES`
+ * with an opaque HTTP 413; this is why we build the app (and mount the parser)
+ * ourselves.
  */
-/** JSON body limit, sized to fit a base64-encoded file_upload plus the envelope. */
 function jsonBodyLimitBytes(config: AppConfig): number {
   const DEFAULT_JSON_LIMIT = 100 * 1024;
   const ENVELOPE_OVERHEAD = 64 * 1024;
