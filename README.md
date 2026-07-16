@@ -247,7 +247,7 @@ WinBridge reads `WINBRIDGE_*` variables. The legacy `PENDRAGON_*` names are stil
 | `WINBRIDGE_ALLOW_SCREENSHOT` | `0` | Set to `1` to enable the `take_screenshot` tool. Disabled by default. |
 | `WINBRIDGE_SCREENSHOT_ROLES` | empty | Comma-separated principal roles allowed to capture. Empty means any authenticated principal (when enabled). |
 | `WINBRIDGE_SCREENSHOT_DIR` | temp subdir | Server-owned directory captures are written to. Callers cannot override it. |
-| `WINBRIDGE_SCREENSHOT_RETENTION_HOURS` | `8` | Captures older than this are deleted (on startup and before each capture). |
+| `WINBRIDGE_SCREENSHOT_RETENTION_HOURS` | `8` | Captures older than this are deleted (on startup and before each capture). Set `0` to keep them indefinitely. |
 | `WINBRIDGE_URL` | `http://127.0.0.1:7573/mcp` | Diagnostic client URL for one WinBridge server. |
 | `WINBRIDGE_URLS` | empty | Diagnostic client comma-separated URLs for multiple servers using `WINBRIDGE_TOKEN`. |
 | `WINBRIDGE_TARGETS` | empty | Diagnostic client JSON array for named servers and per-target token env vars. |

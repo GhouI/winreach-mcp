@@ -157,13 +157,25 @@ function loadTunnelConfig(): TunnelConfig {
 
 const DEFAULT_SCREENSHOT_RETENTION_HOURS = 8;
 
+/** Retention hours: non-negative, where `0` disables the sweep (keep forever). */
+function readScreenshotRetentionHours(): number {
+  const raw = readEnv("SCREENSHOT_RETENTION_HOURS")?.trim();
+  if (!raw) {
+    return DEFAULT_SCREENSHOT_RETENTION_HOURS;
+  }
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new Error("WINBRIDGE_SCREENSHOT_RETENTION_HOURS must be a non-negative number");
+  }
+  return parsed;
+}
+
 function loadScreenshotConfig(): ScreenshotConfig {
-  const retentionHours = readNumberEnv("SCREENSHOT_RETENTION_HOURS", DEFAULT_SCREENSHOT_RETENTION_HOURS);
   return {
     enabled: readBoolEnv("ALLOW_SCREENSHOT", false),
     allowedRoles: readListEnv("SCREENSHOT_ROLES"),
     dir: readEnv("SCREENSHOT_DIR")?.trim() || join(tmpdir(), "winbridge-screenshots"),
-    retentionMs: retentionHours * 60 * 60 * 1000
+    retentionMs: readScreenshotRetentionHours() * 60 * 60 * 1000
   };
 }
 

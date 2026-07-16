@@ -226,3 +226,51 @@ describe("MCP tool calls: policy + audit", () => {
     expect(log).toContain("\"tool\":\"powershell_open_session\"");
   });
 });
+
+describe("take_screenshot gating", () => {
+  const screenshot = (enabled: boolean, allowedRoles: string[]) => ({
+    enabled,
+    allowedRoles,
+    dir: join(tmpdir(), "winbridge-shots-test"),
+    retentionMs: 0
+  });
+
+  async function listToolNames(config: AppConfig, principal: Principal): Promise<string[]> {
+    const sessions = new PowerShellSessionManager(config);
+    const audit = createAuditLogger(undefined);
+    const server = createWinBridgeMcpServer(config, sessions, principal, audit);
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: "test-client", version: "0.0.0" });
+    await Promise.all([client.connect(clientTransport), server.connect(serverTransport)]);
+    cleanups.push(() => {
+      sessions.closeAll();
+      void client.close();
+      void server.close();
+    });
+    const { tools } = await client.listTools();
+    return tools.map((tool) => tool.name);
+  }
+
+  // createPrimaryPrincipal gives role "admin".
+  const admin = () => createPrimaryPrincipal("admin-token", { allow: [], deny: [] });
+
+  it("does not register the tool when screenshots are disabled", async () => {
+    const names = await listToolNames(makeConfig({ screenshot: screenshot(false, []) }), admin());
+    expect(names).not.toContain("take_screenshot");
+  });
+
+  it("registers the tool when enabled with no role restriction", async () => {
+    const names = await listToolNames(makeConfig({ screenshot: screenshot(true, []) }), admin());
+    expect(names).toContain("take_screenshot");
+  });
+
+  it("registers the tool when the principal's role is permitted", async () => {
+    const names = await listToolNames(makeConfig({ screenshot: screenshot(true, ["admin"]) }), admin());
+    expect(names).toContain("take_screenshot");
+  });
+
+  it("does not register the tool when the principal's role is not permitted", async () => {
+    const names = await listToolNames(makeConfig({ screenshot: screenshot(true, ["operator"]) }), admin());
+    expect(names).not.toContain("take_screenshot");
+  });
+});

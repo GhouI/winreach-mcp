@@ -264,12 +264,16 @@ export function createWinBridgeMcpServer(
           dir: config.screenshot.dir,
           retentionMs: config.screenshot.retentionMs
         });
+        // The call is authorized (an unauthorized principal never reaches here,
+        // since the tool is only registered when allowed). A runtime capture
+        // failure is recorded in `reason`, mirroring how the other tools log a
+        // successful authorization with the failure carried in the result.
         await audit.log({
           time: new Date().toISOString(),
           principal: principal.name,
           role: principal.role,
           tool: "take_screenshot",
-          decision: result.success ? "allowed" : "error",
+          decision: "allowed",
           durationMs: result.durationMs,
           bytes: result.success ? result.bytes : undefined,
           path: result.path,
@@ -388,7 +392,10 @@ function screenshotToolResult(result: ScreenshotResult) {
     };
   }
 
-  const { base64, ...metadata } = result;
+  // Do not surface the server-side file path or raw base64 to the caller; the
+  // path is internal (recorded in the audit log instead) and the image bytes are
+  // already returned as the image content block.
+  const { base64, path: _serverPath, ...metadata } = result;
   return {
     content: [
       {
