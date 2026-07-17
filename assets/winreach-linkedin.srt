@@ -1,0 +1,59 @@
+1
+00:00:00,000 --> 00:00:03,000
+An AI agent is controlling this PC —
+from another machine.
+
+2
+00:00:03,000 --> 00:00:07,000
+One command turns a Windows box
+into an MCP server:  npx winreach-mcp
+
+3
+00:00:07,000 --> 00:00:11,000
+It opens a secure Cloudflare tunnel —
+no inbound firewall holes.
+
+4
+00:00:11,000 --> 00:00:15,000
+Any MCP agent connects over HTTP
+with its own bearer key.
+
+5
+00:00:15,000 --> 00:00:20,000
+Run real PowerShell, remotely —
+as a single MCP tool call.
+
+6
+00:00:20,000 --> 00:00:25,000
+Move files both ways —
+sandboxed and hash-verified.
+
+7
+00:00:25,000 --> 00:00:30,000
+Capture the screen
+whenever the agent needs to look.
+
+8
+00:00:30,000 --> 00:00:35,000
+And drive the mouse and keyboard
+like a human — full computer use.
+
+9
+00:00:35,000 --> 00:00:40,000
+Every agent gets its own key and role:
+admin · operator · readonly.
+
+10
+00:00:40,000 --> 00:00:45,000
+A regex command policy blocks
+dangerous commands — live.
+
+11
+00:00:45,000 --> 00:00:50,000
+And every action is written
+to an append-only audit log.
+
+12
+00:00:50,000 --> 00:00:55,000
+WinReach — give your AI agent
+its own Windows machine.
