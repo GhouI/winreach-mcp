@@ -14,6 +14,13 @@ export type Principal = {
   token?: string;
   tokenHash?: string;
   policy: CommandPolicy;
+  /**
+   * Optional allowlist of MCP tool names this principal may use. `undefined`
+   * means every tool (subject to the global gates), so existing principals keep
+   * full access. A list — even an empty one — restricts the principal to exactly
+   * those tools.
+   */
+  tools?: string[];
 };
 
 /** The shape accepted in the WINBRIDGE_PRINCIPALS JSON array. */
@@ -25,6 +32,7 @@ type RawPrincipal = {
   tokenHash?: unknown;
   allow?: unknown;
   deny?: unknown;
+  tools?: unknown;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -90,7 +98,11 @@ export function parsePrincipals(raw: string, env: Record<string, string | undefi
       deny: compilePatterns(asStringArray(raw.deny, `${path}.deny`), `${path}.deny`)
     };
 
-    return { name, role, token, tokenHash, policy };
+    // `tools` is only a restriction when present; leave it undefined otherwise so
+    // the principal keeps access to every tool.
+    const tools = raw.tools === undefined ? undefined : asStringArray(raw.tools, `${path}.tools`);
+
+    return { name, role, token, tokenHash, policy, tools };
   });
 }
 

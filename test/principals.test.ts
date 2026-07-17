@@ -38,6 +38,27 @@ describe("parsePrincipals", () => {
     expect(principals[0].role).toBe("user");
   });
 
+  it("leaves tools undefined when omitted (full access) and parses a tool allowlist", () => {
+    const [full] = parsePrincipals(JSON.stringify([{ token: "t1" }]), {});
+    expect(full.tools).toBeUndefined();
+
+    const [scoped] = parsePrincipals(
+      JSON.stringify([{ token: "t2", tools: ["powershell_execute", "take_screenshot"] }]),
+      {}
+    );
+    expect(scoped.tools).toEqual(["powershell_execute", "take_screenshot"]);
+
+    // An explicit empty list is a real restriction (no tools), not "all".
+    const [none] = parsePrincipals(JSON.stringify([{ token: "t3", tools: [] }]), {});
+    expect(none.tools).toEqual([]);
+  });
+
+  it("rejects a non-string tool allowlist", () => {
+    expect(() => parsePrincipals(JSON.stringify([{ token: "t", tools: [1, 2] }]), {})).toThrow(
+      /tools must be an array of strings/
+    );
+  });
+
   it("rejects invalid JSON", () => {
     expect(() => parsePrincipals("not json", {})).toThrow(/valid JSON/);
   });

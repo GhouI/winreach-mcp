@@ -369,3 +369,59 @@ describe("file transfer gating", () => {
     expect(Buffer.from(downResult.base64, "base64").equals(payload)).toBe(true);
   });
 });
+
+describe("per-principal tool allowlist", () => {
+  async function listToolNames(config: AppConfig, principal: Principal): Promise<string[]> {
+    const sessions = new PowerShellSessionManager(config);
+    const audit = createAuditLogger(undefined);
+    const server = createWinBridgeMcpServer(config, sessions, principal, audit);
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: "test-client", version: "0.0.0" });
+    await Promise.all([client.connect(clientTransport), server.connect(serverTransport)]);
+    cleanups.push(() => {
+      sessions.closeAll();
+      void client.close();
+      void server.close();
+    });
+    const { tools } = await client.listTools();
+    return tools.map((tool) => tool.name);
+  }
+
+  const principal = (tools?: string[]): Principal => ({
+    name: "p",
+    role: "user",
+    token: "t",
+    policy: { allow: [], deny: [] },
+    tools
+  });
+
+  it("exposes every powershell tool when no allowlist is set", async () => {
+    const names = await listToolNames(makeConfig(), principal(undefined));
+    expect(names).toContain("powershell_execute");
+    expect(names).toContain("powershell_open_session");
+    expect(names).toContain("powershell_list_sessions");
+  });
+
+  it("restricts a principal to exactly its listed tools", async () => {
+    const names = await listToolNames(makeConfig(), principal(["powershell_execute"]));
+    expect(names).toEqual(["powershell_execute"]);
+    expect(names).not.toContain("powershell_list_sessions");
+  });
+
+  it("composes with the screenshot gate (needs both enabled and allowlisted)", async () => {
+    const enabled = makeConfig({
+      screenshot: { enabled: true, allowedRoles: [], dir: join(tmpdir(), "s"), retentionMs: 0 }
+    });
+    // Allowlisted + globally enabled -> present.
+    const withShot = await listToolNames(enabled, principal(["powershell_execute", "take_screenshot"]));
+    expect(withShot).toContain("take_screenshot");
+
+    // Globally enabled but not in the principal's allowlist -> hidden.
+    const withoutShot = await listToolNames(enabled, principal(["powershell_execute"]));
+    expect(withoutShot).not.toContain("take_screenshot");
+
+    // In the allowlist but globally disabled -> still hidden.
+    const disabled = await listToolNames(makeConfig(), principal(["powershell_execute", "take_screenshot"]));
+    expect(disabled).not.toContain("take_screenshot");
+  });
+});
