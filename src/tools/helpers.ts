@@ -89,3 +89,16 @@ export function isScreenshotAllowed(config: AppConfig, principal: Principal): bo
   const roles = config.screenshot.allowedRoles;
   return roles.length === 0 || roles.includes(principal.role);
 }
+
+/**
+ * Whether `principal` may drive the desktop. Off unless the operator enabled it;
+ * when enabled, an empty role list allows any principal, otherwise the
+ * principal's role must be listed.
+ */
+export function isComputerUseAllowed(config: AppConfig, principal: Principal): boolean {
+  if (!config.computerUse.enabled) {
+    return false;
+  }
+  const roles = config.computerUse.allowedRoles;
+  return roles.length === 0 || roles.includes(principal.role);
+}

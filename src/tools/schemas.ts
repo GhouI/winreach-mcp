@@ -55,3 +55,34 @@ export const fileDownloadInputSchema = {
     .optional()
     .describe("Delete the source after a successful read, turning the copy into a move. Defaults to false.")
 };
+
+export const computerUseInputSchema = {
+  action: z
+    .enum([
+      "mouse_move",
+      "left_click",
+      "right_click",
+      "middle_click",
+      "double_click",
+      "left_mouse_down",
+      "left_mouse_up",
+      "type",
+      "key",
+      "scroll",
+      "cursor_position",
+      "wait"
+    ])
+    .describe("The desktop input action to perform."),
+  coordinate: z
+    .tuple([z.number().int(), z.number().int()])
+    .optional()
+    .describe("[x, y] absolute pixel in the same virtual-desktop space as take_screenshot."),
+  text: z.string().optional().describe("For action 'type': the text to type verbatim (any Unicode)."),
+  keys: z
+    .string()
+    .optional()
+    .describe("For action 'key': a '+'-separated chord, e.g. 'ctrl+c', 'alt+F4', 'ctrl+shift+Escape'."),
+  scroll_direction: z.enum(["up", "down", "left", "right"]).optional().describe("For action 'scroll'."),
+  scroll_amount: z.number().int().positive().max(100).optional().describe("For action 'scroll': wheel notches."),
+  duration_ms: z.number().int().positive().max(60_000).optional().describe("For action 'wait': milliseconds to pause.")
+};

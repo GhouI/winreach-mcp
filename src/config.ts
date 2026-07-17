@@ -35,6 +35,27 @@ export type ScreenshotConfig = {
 };
 
 /**
+ * Authorization for the desktop input tool (`computer_use`). GUI actuation
+ * bypasses the command policy entirely (an agent can type a blocked command into
+ * a window), so it is the most dangerous capability: disabled by default and
+ * intended for trusted roles only.
+ */
+export type ComputerUseConfig = {
+  /** When false the tool is not registered at all. */
+  enabled: boolean;
+  /** Roles permitted to control the desktop. Empty means any authenticated principal. */
+  allowedRoles: string[];
+  /** Compiled key-chord denylist (e.g. `win\+r`). Empty means every chord is allowed. */
+  keyDenylist: RegExp[];
+  /** Per-principal action rate cap (actions/second). */
+  maxActionsPerSec: number;
+  /** If this file exists on disk, every action is refused (operator kill switch). */
+  haltFile?: string;
+  /** When true, `type` actions record the raw text in the audit log (default: hash + length only). */
+  auditText: boolean;
+};
+
+/**
  * Authorization for the file-transfer tools (`file_upload` / `file_download`).
  * These read and write host files, bypassing the command policy, so they are
  * only enabled when the operator configures a root directory. Every path is
@@ -65,6 +86,8 @@ export type AppConfig = {
   tls?: TlsConfig;
   /** Screen-capture authorization. Disabled unless explicitly turned on. */
   screenshot: ScreenshotConfig;
+  /** Desktop input authorization. Disabled unless explicitly turned on. */
+  computerUse: ComputerUseConfig;
   /** File-transfer authorization. Disabled unless a root directory is set. */
   fileTransfer: FileTransferConfig;
   allowedOrigins: string[];
@@ -197,6 +220,20 @@ function loadScreenshotConfig(): ScreenshotConfig {
   };
 }
 
+function loadComputerUseConfig(): ComputerUseConfig {
+  return {
+    enabled: readBoolEnv("ALLOW_COMPUTER_USE", false),
+    allowedRoles: readListEnv("COMPUTER_USE_ROLES"),
+    keyDenylist: compilePatterns(
+      readPatternListEnv("COMPUTER_USE_KEY_DENYLIST"),
+      "WINBRIDGE_COMPUTER_USE_KEY_DENYLIST"
+    ),
+    maxActionsPerSec: readNumberEnv("COMPUTER_USE_MAX_ACTIONS_PER_SEC", 10),
+    haltFile: readEnv("COMPUTER_USE_HALT_FILE")?.trim() || undefined,
+    auditText: readBoolEnv("COMPUTER_USE_AUDIT_TEXT", false)
+  };
+}
+
 const DEFAULT_MAX_FILE_BYTES = 75 * 1024 * 1024;
 
 function loadFileTransferConfig(): FileTransferConfig {
@@ -284,6 +321,7 @@ export function loadConfig(): AppConfig {
     auditLogPath: readEnv("AUDIT_LOG")?.trim() || undefined,
     tls: loadTlsConfig(),
     screenshot: loadScreenshotConfig(),
+    computerUse: loadComputerUseConfig(),
     fileTransfer: loadFileTransferConfig(),
     allowedOrigins: readListEnv("ALLOWED_ORIGINS"),
     shellPath: readEnv("SHELL_PATH"),
