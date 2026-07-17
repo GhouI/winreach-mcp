@@ -1,0 +1,26 @@
+# Smithery configuration for WinReach.
+# https://smithery.ai/docs/build/project-config/smithery.yaml
+#
+# WinReach runs as a local stdio MCP server here: Smithery launches
+# `npx -y winreach-mcp --stdio`. Provide a bearer token, or leave it blank to let
+# WinReach mint an ephemeral in-memory admin token for the local session.
+startCommand:
+  type: stdio
+  configSchema:
+    type: object
+    properties:
+      winreachToken:
+        type: string
+        title: WinReach bearer token
+        description: >-
+          Bearer token for the implicit local admin principal. Leave empty to use
+          an ephemeral in-memory token for this stdio session.
+    required: []
+  commandFunction: |-
+    (config) => ({
+      command: 'npx',
+      args: ['-y', 'winreach-mcp', '--stdio'],
+      env: config.winreachToken ? { WINREACH_TOKEN: config.winreachToken } : {}
+    })
+  exampleConfig:
+    winreachToken: paste-a-winreach-token-here

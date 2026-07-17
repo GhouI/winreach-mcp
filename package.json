@@ -7,14 +7,29 @@
   "keywords": [
     "mcp",
     "model-context-protocol",
-    "powershell",
+    "mcp-server",
     "windows",
-    "windows-server",
+    "powershell",
+    "computer-use",
     "ai-agents",
+    "claude",
+    "remote",
+    "windows-server",
     "codex",
     "claude-code",
     "remote-execution",
     "cloudflare-tunnel"
+  ],
+  "bin": {
+    "winreach-mcp": "dist/src/cli.js"
+  },
+  "files": [
+    "dist/",
+    "server.json",
+    "smithery.yaml",
+    "dxt/manifest.json",
+    "README.md",
+    "LICENSE"
   ],
   "repository": {
     "type": "git",
@@ -26,6 +41,7 @@
   "homepage": "https://github.com/GhouI/winreach-mcp#readme",
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "prepublishOnly": "npm run build",
     "start": "node dist/src/server.js",
     "dev": "tsx src/server.ts",
     "client": "tsx src/client.ts",

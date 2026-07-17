@@ -1,0 +1,66 @@
+{
+  "dxt_version": "0.1",
+  "name": "winreach-mcp",
+  "display_name": "WinReach for Windows",
+  "version": "0.2.0",
+  "description": "Headless PowerShell, screenshots, file transfer, and computer_use on a Windows host, exposed to Claude Desktop over a local stdio MCP server.",
+  "long_description": "WinReach gives AI agents secure PowerShell access to the Windows host. Claude Desktop extensions launch a LOCAL process, so this extension runs WinReach in stdio mode via `npx -y winreach-mcp --stdio`. A remote WinReach HTTP server cannot itself be a DXT (there is no local process to launch); to connect to a remote WinReach instead, add it as an `mcpServers` entry with a Streamable-HTTP URL and an `Authorization: Bearer` header (see the project README). Provide a WINREACH_TOKEN below, or leave it blank to let WinReach mint an ephemeral in-memory admin token for the session.",
+  "author": {
+    "name": "GhouI",
+    "url": "https://github.com/GhouI"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/GhouI/winreach-mcp"
+  },
+  "homepage": "https://github.com/GhouI/winreach-mcp#readme",
+  "documentation": "https://github.com/GhouI/winreach-mcp#readme",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "windows",
+    "powershell",
+    "computer-use",
+    "ai-agents"
+  ],
+  "server": {
+    "type": "node",
+    "entry_point": "dist/src/cli.js",
+    "mcp_config": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "winreach-mcp",
+        "--stdio"
+      ],
+      "env": {
+        "WINREACH_TOKEN": "${user_config.winreach_token}"
+      }
+    }
+  },
+  "tools": [
+    { "name": "powershell_execute", "description": "Run an isolated PowerShell command." },
+    { "name": "powershell_open_session", "description": "Open a stateful PowerShell session." },
+    { "name": "powershell_send", "description": "Send a command to an open session." },
+    { "name": "powershell_close_session", "description": "Close an open session." },
+    { "name": "take_screenshot", "description": "Capture the desktop (when enabled)." },
+    { "name": "computer_use", "description": "Drive mouse and keyboard input (when enabled)." },
+    { "name": "file_upload", "description": "Upload a file into the sandbox root (when enabled)." },
+    { "name": "file_download", "description": "Download a file from the sandbox root (when enabled)." }
+  ],
+  "user_config": {
+    "winreach_token": {
+      "type": "string",
+      "title": "WinReach bearer token",
+      "description": "Bearer token for the local admin principal. Leave blank to mint an ephemeral in-memory token. Generate one with: npx winreach-mcp gen-token",
+      "sensitive": true,
+      "required": false
+    }
+  },
+  "compatibility": {
+    "platforms": ["win32"],
+    "runtimes": {
+      "node": ">=24.0.0"
+    }
+  }
+}
