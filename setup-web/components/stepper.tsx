@@ -1,69 +1,64 @@
 "use client";
 
-// Horizontal stage indicator for the setup wizard. Steps are freely
-// navigable; visited steps show a check, steps with active warnings get an
-// amber dot so problems stay visible from any stage.
+// Numbered step indicator for onboarding. A horizontal row of numbered nodes
+// joined by a progress track: completed nodes are inked amber (with a check),
+// the current node is ringed amber, upcoming nodes are quiet. Steps stay freely
+// navigable — click any node to jump. Labels show from `sm`; on narrow screens
+// the content area carries a "Step X of N" heading instead.
 
+import { Fragment } from "react";
 import { CheckIcon } from "@/components/icons";
 
 export function Stepper({
   steps,
-  active,
+  current,
   onSelect,
-  flagged,
 }: {
   steps: string[];
-  active: number;
+  current: number;
   onSelect: (index: number) => void;
-  flagged: number[];
 }) {
+  const last = steps.length - 1;
   return (
-    <nav aria-label="Setup stages">
-      <ol className="flex items-center gap-1 overflow-x-auto pb-1 code-scroll">
+    <nav aria-label="Setup steps">
+      <ol className="flex items-start">
         {steps.map((title, i) => {
-          const isActive = i === active;
-          const isDone = i < active;
-          const hasFlag = flagged.includes(i);
+          const state = i < current ? "done" : i === current ? "active" : "todo";
           return (
-            <li key={title} className="flex shrink-0 items-center gap-1">
-              {i > 0 && <span aria-hidden className="h-px w-3 bg-border sm:w-4" />}
-              <button
-                type="button"
-                onClick={() => onSelect(i)}
-                aria-current={isActive ? "step" : undefined}
-                className={`group flex items-center gap-2 rounded-full py-1 pl-1 pr-2.5 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
-                  isActive ? "bg-accent/10" : "hover:bg-surface-muted"
-                }`}
-              >
-                <span className="relative">
-                  <span
-                    className={`flex size-6 items-center justify-center rounded-full text-[11px] font-semibold transition ${
-                      isActive
-                        ? "bg-accent text-accent-fg"
-                        : isDone
-                          ? "bg-accent/15 text-accent"
-                          : "border border-border-strong bg-surface text-muted"
-                    }`}
-                  >
-                    {isDone ? <CheckIcon className="size-3" /> : i + 1}
-                  </span>
-                  {hasFlag && (
-                    <span
-                      aria-hidden
-                      className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-amber-500 ring-2 ring-background"
-                    />
-                  )}
-                </span>
+            <Fragment key={title}>
+              <li className="flex min-w-0 shrink-0 flex-col items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => onSelect(i)}
+                  aria-current={state === "active" ? "step" : undefined}
+                  aria-label={`Step ${i + 1}: ${title}`}
+                  className={`flex size-8 items-center justify-center rounded-full text-[12px] font-semibold tabular-nums transition-colors ${
+                    state === "done"
+                      ? "bg-accent text-accent-fg"
+                      : state === "active"
+                        ? "border-2 border-accent bg-background text-foreground"
+                        : "border border-border-strong bg-surface text-faint hover:border-faint hover:text-muted"
+                  }`}
+                >
+                  {state === "done" ? <CheckIcon className="size-4" /> : i + 1}
+                </button>
                 <span
-                  className={`text-xs font-medium ${
-                    isActive ? "text-foreground" : "hidden text-muted group-hover:text-foreground sm:block"
+                  className={`hidden max-w-[9ch] truncate text-[12px] leading-none sm:block ${
+                    state === "todo" ? "text-faint" : "font-medium text-foreground"
                   }`}
                 >
                   {title}
-                  {hasFlag && <span className="sr-only"> (has warnings)</span>}
                 </span>
-              </button>
-            </li>
+              </li>
+              {i < last && (
+                <li
+                  aria-hidden
+                  className={`mt-4 h-0.5 min-w-[12px] flex-1 rounded-full transition-colors ${
+                    i < current ? "bg-accent" : "bg-border"
+                  }`}
+                />
+              )}
+            </Fragment>
           );
         })}
       </ol>

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   assertUniqueTokens,
@@ -5,6 +6,8 @@ import {
   parsePrincipals,
   resolvePrincipal
 } from "../src/principals.js";
+
+const sha256 = (s: string) => createHash("sha256").update(s, "utf8").digest("hex");
 
 describe("parsePrincipals", () => {
   it("parses inline tokens with name, role, and policy", () => {
@@ -71,6 +74,19 @@ describe("parsePrincipals", () => {
   it("rejects a tokenEnv pointing at an empty variable", () => {
     expect(() => parsePrincipals(JSON.stringify([{ tokenEnv: "MISSING" }]), {})).toThrow(/empty env var/);
   });
+
+  it("parses a principal defined by tokenHash only (no plaintext token)", () => {
+    const h = sha256("a-store-issued-key");
+    const [p] = parsePrincipals(JSON.stringify([{ name: "svc", tokenHash: h }]), {});
+    expect(p.token).toBeUndefined();
+    expect(p.tokenHash).toBe(h);
+  });
+
+  it("rejects a malformed tokenHash", () => {
+    expect(() => parsePrincipals(JSON.stringify([{ tokenHash: "not-a-hash" }]), {})).toThrow(
+      /tokenHash must be/
+    );
+  });
 });
 
 describe("resolvePrincipal", () => {
@@ -91,6 +107,13 @@ describe("resolvePrincipal", () => {
   it("does not match on a prefix", () => {
     expect(resolvePrincipal(principals, "admin")).toBeUndefined();
   });
+
+  it("resolves a principal by tokenHash when the presented token hashes to it", () => {
+    const token = "the-real-store-issued-token";
+    const byHash = parsePrincipals(JSON.stringify([{ name: "svc", tokenHash: sha256(token) }]), {});
+    expect(resolvePrincipal(byHash, token)?.name).toBe("svc");
+    expect(resolvePrincipal(byHash, "wrong-token")).toBeUndefined();
+  });
 });
 
 describe("assertUniqueTokens", () => {
@@ -109,6 +132,15 @@ describe("assertUniqueTokens", () => {
         createPrimaryPrincipal("dup", { allow: [], deny: [] }),
         { name: "alice", role: "user", token: "dup", policy: { allow: [], deny: [] } }
       ])
-    ).toThrow(/Duplicate principal token/);
+    ).toThrow(/Duplicate principal credential/);
+  });
+
+  it("detects a plaintext token colliding with a matching tokenHash", () => {
+    expect(() =>
+      assertUniqueTokens([
+        createPrimaryPrincipal("shared", { allow: [], deny: [] }),
+        { name: "svc", role: "user", tokenHash: sha256("shared"), policy: { allow: [], deny: [] } }
+      ])
+    ).toThrow(/Duplicate principal credential/);
   });
 });

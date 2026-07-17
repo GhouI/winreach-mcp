@@ -59,7 +59,7 @@ describe("loadConfig authentication", () => {
   it("rejects a principal token that duplicates the primary token", () => {
     process.env.WINBRIDGE_TOKEN = "dup";
     process.env.WINBRIDGE_PRINCIPALS = JSON.stringify([{ name: "alice", token: "dup" }]);
-    expect(() => loadConfig()).toThrow(/Duplicate principal token/);
+    expect(() => loadConfig()).toThrow(/Duplicate principal credential/);
   });
 });
 

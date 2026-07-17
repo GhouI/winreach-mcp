@@ -12,6 +12,7 @@ import { timingSafeEqual } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { readStoredConfig, writeStoredConfig } from "@/lib/config-store";
 import { sanitizeConfig } from "@/lib/form-state";
+import { clientKey, crossOriginError, rateLimit, rateLimited, readJsonCapped } from "@/lib/http-guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -47,6 +48,7 @@ function authorize(req: NextRequest): NextResponse | null {
 }
 
 export async function GET(req: NextRequest) {
+  if (!rateLimit(`setupkey:${clientKey(req)}`, 30, 5 * 60_000)) return rateLimited();
   const denied = authorize(req);
   if (denied) return denied;
 
@@ -61,15 +63,15 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PUT(req: NextRequest) {
+  const xo = crossOriginError(req);
+  if (xo) return xo;
+  if (!rateLimit(`setupkey:${clientKey(req)}`, 30, 5 * 60_000)) return rateLimited();
   const denied = authorize(req);
   if (denied) return denied;
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Body must be JSON." }, { status: 400 });
-  }
+  const parsed = await readJsonCapped(req, 256 * 1024);
+  if ("error" in parsed) return parsed.error;
+  const body = parsed.body;
 
   // Accept either a bare config or { config: ... }; unknown fields are dropped
   // and missing ones fall back to defaults.

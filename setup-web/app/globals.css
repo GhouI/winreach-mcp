@@ -1,50 +1,78 @@
 @import "tailwindcss";
 
 /* ---------------------------------------------------------------------------
-   Design tokens
-   A small neutral palette with one accent. Light values live on :root and are
-   overridden for dark via prefers-color-scheme; Tailwind utilities pick them
-   up through the @theme mapping below (e.g. bg-surface, text-muted).
+   Design tokens — near-black + amber.
+
+   Warm neutrals (paper / graphite) with a single industrial amber accent.
+   Amber is used two ways and never interchangeably:
+
+     --accent       amber as a FILL (buttons, rules, markers) — always paired
+                    with --accent-fg (near-black) for contrast in both themes.
+     --accent-text  amber as TEXT — bronze in light (readable on paper),
+                    amber in dark.
+
+   Warnings deliberately sit on a separate ORANGE hue (--warn) so they never
+   read as brand accent. Status greens/reds are muted and text-safe.
 --------------------------------------------------------------------------- */
 
 :root {
-  /* neutrals */
-  --background: #fafafa;
+  /* cool neutrals (light) */
+  --background: #ffffff;
   --surface: #ffffff;
   --surface-muted: #f4f4f5;
-  --foreground: #18181b;
+  --foreground: #0a0a0a;
   --muted: #52525b;
   --faint: #a1a1aa;
   --border: #e4e4e7;
   --border-strong: #d4d4d8;
 
-  /* one accent */
-  --accent: #2563eb;
-  --accent-hover: #1d4ed8;
-  --accent-fg: #ffffff;
+  /* crisp yellow accent */
+  --accent: #facc15;
+  --accent-hover: #eab308;
+  --accent-fg: #0a0a0a;
+  --accent-text: #a16207; /* readable gold as text on white */
 
-  /* code viewer (always dark, both themes) */
-  --code: #0d1117;
-  --code-fg: #dbe1e8;
-  --code-muted: #8b949e;
+  /* semantics */
+  --warn: #c2410c;
+  --ok: #15803d;
+  --danger: #dc2626;
+
+  --focus: #ca8a04;
+
+  /* code viewer (always near-black) */
+  --code: #0a0a0a;
+  --code-fg: #ededed;
+  --code-muted: #8b8b8f;
+  --code-accent: #facc15;
+  --code-ok: #4ade80;
+  --code-border: #262626;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #09090b;
-    --surface: #111114;
-    --surface-muted: #18181c;
-    --foreground: #f4f4f5;
+    /* true black + vivid yellow */
+    --background: #0a0a0a;
+    --surface: #141416;
+    --surface-muted: #1c1c1f;
+    --foreground: #fafafa;
     --muted: #a1a1aa;
-    --faint: #6b6b74;
-    --border: #26262c;
-    --border-strong: #3b3b44;
+    --faint: #71717a;
+    --border: #262629;
+    --border-strong: #3f3f46;
 
-    --accent: #3b82f6;
-    --accent-hover: #60a5fa;
-    --accent-fg: #ffffff;
+    --accent: #facc15;
+    --accent-hover: #fde047;
+    --accent-fg: #0a0a0a;
+    --accent-text: #facc15; /* vivid yellow reads fine on black */
 
-    --code: #0b0e13;
+    --warn: #fb923c;
+    --ok: #4ade80;
+    --danger: #f87171;
+
+    --focus: #facc15;
+
+    --code: #000000;
+    --code-border: #1f1f1f;
   }
 }
 
@@ -60,9 +88,16 @@
   --color-accent: var(--accent);
   --color-accent-hover: var(--accent-hover);
   --color-accent-fg: var(--accent-fg);
+  --color-accent-text: var(--accent-text);
+  --color-warn: var(--warn);
+  --color-ok: var(--ok);
+  --color-danger: var(--danger);
   --color-code: var(--code);
   --color-code-fg: var(--code-fg);
   --color-code-muted: var(--code-muted);
+  --color-code-accent: var(--code-accent);
+  --color-code-ok: var(--code-ok);
+  --color-code-border: var(--code-border);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
@@ -75,25 +110,37 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-feature-settings: "ss01";
 }
 
 ::selection {
-  background: color-mix(in oklab, var(--accent) 24%, transparent);
+  background: color-mix(in oklab, var(--accent) 32%, transparent);
 }
 
-/* Soft accent glow behind the page header. */
-.top-glow {
-  background: radial-gradient(
-    52% 340px at 50% 0%,
-    color-mix(in oklab, var(--accent) 7%, transparent),
-    transparent 72%
-  );
+/* One consistent, high-visibility focus treatment everywhere. */
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline-offset: 0;
 }
 
-/* Slim, unobtrusive scrollbars for the code viewer. */
+/* Small uppercase label used for section/stage eyebrows. */
+.eyebrow {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+/* Slim, unobtrusive scrollbars for code/tab strips. */
 .code-scroll {
   scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
+  scrollbar-color: color-mix(in oklab, var(--faint) 45%, transparent) transparent;
 }
 .code-scroll::-webkit-scrollbar {
   width: 8px;
@@ -103,9 +150,21 @@ body {
   background: transparent;
 }
 .code-scroll::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, 0.28);
+  background: color-mix(in oklab, var(--faint) 40%, transparent);
   border-radius: 9999px;
 }
 .code-scroll::-webkit-scrollbar-thumb:hover {
-  background: rgba(148, 163, 184, 0.45);
+  background: color-mix(in oklab, var(--faint) 60%, transparent);
+}
+
+/* Respect users who prefer reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

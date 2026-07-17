@@ -199,6 +199,23 @@ export function connectUrl(cfg: WinBridgeConfig): string {
   return `${scheme(cfg)}://${cfg.host}:${cfg.port}${cfg.endpointPath}`;
 }
 
+/**
+ * A dotenv-style `winbridge.env` file (KEY=VALUE lines) that the host can load
+ * to run WinBridge. In users mode the principals array is emitted as compact
+ * single-line JSON so it stays on one line.
+ */
+export function buildEnvFile(cfg: WinBridgeConfig): string {
+  const lines: string[] = [];
+  if (cfg.authMode === "users") {
+    const compact = JSON.stringify(JSON.parse(buildPrincipalsJson(cfg)));
+    lines.push(`WINBRIDGE_PRINCIPALS=${compact}`);
+  }
+  for (const e of buildEnvVars(cfg)) {
+    lines.push(`${e.name}=${e.value}`);
+  }
+  return lines.join("\n") + "\n";
+}
+
 /** A complete start-*.ps1 script: env, install, run. */
 export function buildStartScript(cfg: WinBridgeConfig): string {
   const lines = [
