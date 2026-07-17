@@ -2,7 +2,7 @@
   "dxt_version": "0.1",
   "name": "winreach-mcp",
   "display_name": "WinReach for Windows",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Headless PowerShell, screenshots, file transfer, and computer_use on a Windows host, exposed to Claude Desktop over a local stdio MCP server.",
   "long_description": "WinReach gives AI agents secure PowerShell access to the Windows host. Claude Desktop extensions launch a LOCAL process, so this extension runs WinReach in stdio mode via `npx -y winreach-mcp --stdio`. A remote WinReach HTTP server cannot itself be a DXT (there is no local process to launch); to connect to a remote WinReach instead, add it as an `mcpServers` entry with a Streamable-HTTP URL and an `Authorization: Bearer` header (see the project README). Provide a WINREACH_TOKEN below, or leave it blank to let WinReach mint an ephemeral in-memory admin token for the session.",
   "author": {

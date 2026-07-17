@@ -1,8 +1,8 @@
 {
   "name": "winreach-mcp",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "type": "module",
-  "description": "Remote MCP bridge that gives AI agents secure headless PowerShell access to Windows hosts, with one-command public Cloudflare tunnels.",
+  "description": "Give your AI agent its own Windows machine: remote PowerShell, file transfer, screenshots, and full desktop control (computer use) over HTTP, secured with per-user keys, roles, command policies, mTLS, and an audit log.",
   "license": "MIT",
   "keywords": [
     "mcp",
@@ -24,7 +24,7 @@
     "winreach-mcp": "dist/src/cli.js"
   },
   "files": [
-    "dist/",
+    "dist/src/",
     "server.json",
     "smithery.yaml",
     "dxt/manifest.json",
