@@ -7,6 +7,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { requireAdmin } from "@/lib/store/session";
+import { crossOriginError, readJsonCapped } from "@/lib/http-guard";
 import { encryptAtRest, encryptionAvailable, generateToken, hashToken } from "@/lib/store/crypto";
 import type { AccountUser, UserPatch } from "@/lib/store/types";
 
@@ -34,17 +35,15 @@ function toStringList(v: unknown): string[] {
 }
 
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const xo = crossOriginError(req);
+  if (xo) return xo;
   const auth = await requireAdmin(req);
   if (auth instanceof NextResponse) return auth;
   const { id } = await ctx.params;
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Body must be JSON." }, { status: 400 });
-  }
-  const b = (body ?? {}) as Record<string, unknown>;
+  const parsed = await readJsonCapped(req, 32 * 1024);
+  if ("error" in parsed) return parsed.error;
+  const b = (parsed.body ?? {}) as Record<string, unknown>;
 
   const patch: UserPatch = {};
   if (typeof b.name === "string") {
@@ -82,6 +81,8 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 }
 
 export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const xo = crossOriginError(req);
+  if (xo) return xo;
   const auth = await requireAdmin(req);
   if (auth instanceof NextResponse) return auth;
   const { id } = await ctx.params;

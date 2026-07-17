@@ -9,6 +9,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { authorizeSetupKey } from "@/lib/setup-key";
+import { clientKey, crossOriginError, rateLimit, rateLimited, readJsonCapped } from "@/lib/http-guard";
 import { createStore } from "@/lib/store/index";
 import {
   getStore,
@@ -47,6 +48,7 @@ function parseConfig(raw: unknown): ParseResult {
 }
 
 export async function GET(req: NextRequest) {
+  if (!rateLimit(`setupkey:${clientKey(req)}`, 30, 5 * 60_000)) return rateLimited();
   const denied = authorizeSetupKey(req);
   if (denied) return denied;
 
@@ -71,16 +73,15 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const xo = crossOriginError(req);
+  if (xo) return xo;
+  if (!rateLimit(`setupkey:${clientKey(req)}`, 30, 5 * 60_000)) return rateLimited();
   const denied = authorizeSetupKey(req);
   if (denied) return denied;
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Body must be JSON." }, { status: 400 });
-  }
-  const b = (body ?? {}) as Record<string, unknown>;
+  const read = await readJsonCapped(req, 16 * 1024);
+  if ("error" in read) return read.error;
+  const b = (read.body ?? {}) as Record<string, unknown>;
   const action = b.action === "setup" ? "setup" : b.action === "test" ? "test" : null;
   if (!action) {
     return NextResponse.json({ error: 'action must be "test" or "setup".' }, { status: 400 });

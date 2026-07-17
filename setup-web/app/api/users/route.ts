@@ -10,6 +10,7 @@
 
 import { NextResponse, type NextRequest } from "next/server";
 import { requireAdmin } from "@/lib/store/session";
+import { crossOriginError, readJsonCapped } from "@/lib/http-guard";
 import { buildPrincipalsFromUsers } from "@/lib/store/principals";
 import { encryptAtRest, encryptionAvailable, generateToken, hashToken } from "@/lib/store/crypto";
 import type { AccountUser, NewUserInput } from "@/lib/store/types";
@@ -50,16 +51,14 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const xo = crossOriginError(req);
+  if (xo) return xo;
   const auth = await requireAdmin(req);
   if (auth instanceof NextResponse) return auth;
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Body must be JSON." }, { status: 400 });
-  }
-  const b = (body ?? {}) as Record<string, unknown>;
+  const parsed = await readJsonCapped(req, 32 * 1024);
+  if ("error" in parsed) return parsed.error;
+  const b = (parsed.body ?? {}) as Record<string, unknown>;
 
   const name = typeof b.name === "string" ? b.name.trim() : "";
   if (!name) return NextResponse.json({ error: "name is required." }, { status: 400 });

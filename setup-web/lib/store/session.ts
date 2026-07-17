@@ -33,8 +33,19 @@ function b64url(buf: Buffer): string {
   return buf.toString("base64url");
 }
 
+// Purpose-separated signing key derived from the secret, so session HMACs never
+// use the same key material as the AES-GCM at-rest key (which derives from the
+// same secret via scrypt with a different label). Cached per process.
+let cachedSessionKey: Buffer | null = null;
+function sessionKey(): Buffer {
+  if (!cachedSessionKey) {
+    cachedSessionKey = createHmac("sha256", sessionSecret()).update("winbridge-session-hmac-v1").digest();
+  }
+  return cachedSessionKey;
+}
+
 function sign(payloadB64: string): string {
-  return createHmac("sha256", sessionSecret()).update(payloadB64).digest("base64url");
+  return createHmac("sha256", sessionKey()).update(payloadB64).digest("base64url");
 }
 
 /** Build a signed session token for an admin, valid for SESSION_MAX_AGE_SECONDS. */

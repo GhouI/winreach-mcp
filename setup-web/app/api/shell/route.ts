@@ -13,6 +13,7 @@
 import { execFile, type ExecFileException } from "node:child_process";
 import { NextResponse, type NextRequest } from "next/server";
 import { requireAdmin } from "@/lib/store/session";
+import { crossOriginError, readJsonCapped } from "@/lib/http-guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,6 +22,9 @@ const TIMEOUT_MS = 20_000; // hard wall-clock limit per command
 const MAX_BUFFER = 1024 * 1024; // 1 MiB per stream while running
 const MAX_CHARS = 100_000; // per-stream cap on the JSON response
 const MAX_COMMAND_LENGTH = 4_000;
+const MAX_CONCURRENT = 4; // cap simultaneous shell runs per process
+
+let running = 0;
 
 type ShellResult = {
   stdout: string;
@@ -81,18 +85,16 @@ function cap(text: string): { text: string; cut: boolean } {
 }
 
 export async function POST(req: NextRequest) {
+  const xo = crossOriginError(req);
+  if (xo) return xo;
   // Admin session required — identical gate to the accounts API.
   const auth = await requireAdmin(req);
   if (auth instanceof NextResponse) return auth;
 
-  let body: unknown;
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Body must be JSON." }, { status: 400 });
-  }
-  const command = typeof (body as { command?: unknown })?.command === "string"
-    ? ((body as { command: string }).command)
+  const parsed = await readJsonCapped(req, 8 * 1024);
+  if ("error" in parsed) return parsed.error;
+  const command = typeof (parsed.body as { command?: unknown })?.command === "string"
+    ? ((parsed.body as { command: string }).command)
     : "";
   if (!command.trim()) {
     return NextResponse.json({ error: "command is required." }, { status: 400 });
@@ -104,7 +106,20 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const result = await runCommand(command);
+  if (running >= MAX_CONCURRENT) {
+    return NextResponse.json(
+      { error: "Too many commands running. Wait for one to finish." },
+      { status: 429 },
+    );
+  }
+
+  running += 1;
+  let result;
+  try {
+    result = await runCommand(command);
+  } finally {
+    running -= 1;
+  }
   const out = cap(result.stdout);
   const err = cap(result.stderr);
   return NextResponse.json({

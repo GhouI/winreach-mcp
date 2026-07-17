@@ -146,8 +146,11 @@ export function AccountsPanel({
 function AuthGate({ signup, onDone }: { signup: boolean; onDone: () => void }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [setupKey, setSetupKey] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  const canSubmit = Boolean(username.trim() && password && (!signup || setupKey.trim()));
 
   const submit = async () => {
     setBusy(true);
@@ -155,7 +158,12 @@ function AuthGate({ signup, onDone }: { signup: boolean; onDone: () => void }) {
     try {
       const res = await fetch(signup ? "/api/auth/signup" : "/api/auth/login", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          // First-admin creation is gated by the setup key so only the operator
+          // can claim the admin.
+          ...(signup ? { authorization: `Bearer ${setupKey.trim()}` } : {}),
+        },
         body: JSON.stringify({ username: username.trim(), password }),
       });
       const data = await res.json().catch(() => null);
@@ -177,29 +185,30 @@ function AuthGate({ signup, onDone }: { signup: boolean; onDone: () => void }) {
         title={signup ? "Create the first admin" : "Admin sign in"}
         desc={
           signup
-            ? "No admin exists yet. Choose a username and a password (8+ characters)."
+            ? "No admin exists yet. Creating it requires the setup key so only the operator can claim the first admin."
             : "Sign in to manage WinBridge account keys."
         }
       >
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            if (!busy && username.trim() && password) void submit();
+            if (!busy && canSubmit) void submit();
           }}
           className="space-y-5"
         >
+          {signup && (
+            <Field label="Setup key" hint="Must match WINBRIDGE_SETUP_KEY on this host.">
+              <TextInput value={setupKey} onChange={setSetupKey} placeholder="paste your setup key" mono />
+            </Field>
+          )}
           <Field label="Username">
             <TextInput value={username} onChange={setUsername} placeholder="admin" mono />
           </Field>
-          <Field label="Password" hint={signup ? "At least 8 characters." : undefined}>
+          <Field label="Password" hint={signup ? "At least 12 characters." : undefined}>
             <TextInput value={password} onChange={setPassword} type="password" />
           </Field>
           {err && <StatusMsg tone="err">{err}</StatusMsg>}
-          <button
-            type="submit"
-            disabled={busy || !username.trim() || !password}
-            className={`${btnPrimary} w-full`}
-          >
+          <button type="submit" disabled={busy || !canSubmit} className={`${btnPrimary} w-full`}>
             {busy ? "Working…" : signup ? "Create admin & continue" : "Sign in"}
           </button>
         </form>
