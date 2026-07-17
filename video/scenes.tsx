@@ -1,580 +1,743 @@
 import React from "react";
-import { AbsoluteFill, Easing, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
-import { theme } from "./theme";
-import { fadeIn, isAfter, rise, useTyped } from "./helpers";
+import { AbsoluteFill, interpolate, useCurrentFrame } from "remotion";
+import { sp, theme } from "./theme";
+import {
+  ClickRipple,
+  Cursor,
+  EASE_OUT,
+  ease,
+  fadeIn,
+  isAfter,
+  Kicker,
+  useCaret,
+  useEnter,
+  useSpringAt,
+  useTyped,
+  WindowChrome,
+} from "./helpers";
+import { CmdLine, OutLine, psHighlight, TermBody, ToolCall } from "./terminal";
 
 const center: React.CSSProperties = {
   justifyContent: "center",
   alignItems: "center",
   textAlign: "center",
+  flexDirection: "column",
 };
 
-// ─────────────────────────────────────────────────────────────────────────
-// Small shared bits
-// ─────────────────────────────────────────────────────────────────────────
+// Shared headline style.
+const H: React.CSSProperties = {
+  fontSize: 46,
+  fontWeight: 700,
+  letterSpacing: -1,
+  lineHeight: 1.1,
+  margin: 0,
+};
 
-const Kicker: React.FC<{ children: React.ReactNode; color: string; o: number }> = ({
+// ═════════════════════════════════════════════════════════════════════════
+// Scene 1 — Hook
+// ═════════════════════════════════════════════════════════════════════════
+
+const Word: React.FC<{ children: React.ReactNode; delay: number; accent?: boolean }> = ({
   children,
-  color,
-  o,
-}) => (
-  <div
-    style={{
-      opacity: o,
-      display: "inline-block",
-      color,
-      border: `1px solid ${color}55`,
-      background: `${color}14`,
-      padding: "8px 16px",
-      borderRadius: 999,
-      fontSize: 18,
-      fontWeight: 700,
-      letterSpacing: 1.5,
-      textTransform: "uppercase",
-    }}
-  >
-    {children}
-  </div>
-);
+  delay,
+  accent,
+}) => {
+  const e = useEnter(delay, 26);
+  return (
+    <span
+      style={{
+        display: "inline-block",
+        opacity: e.opacity,
+        transform: `translateY(${e.translateY}px)`,
+        color: accent ? theme.amber : theme.ink,
+        marginRight: "0.28em",
+      }}
+    >
+      {children}
+    </span>
+  );
+};
 
-// ─────────────────────────────────────────────────────────────────────────
-// Scene 1 — The Problem
-// ─────────────────────────────────────────────────────────────────────────
-
-export const SceneProblem: React.FC = () => {
+export const SceneHook: React.FC = () => {
   const frame = useCurrentFrame();
-
-  const k = fadeIn(frame, 4, 18);
-  const h = rise(frame, 14, 34);
-  const sub = rise(frame, 30, 50);
-
-  // The RDP "trap" frame draws itself in, then a faint lock settles on it.
-  const draw = interpolate(frame, [40, 70], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.inOut(Easing.cubic),
-  });
-  const lock = fadeIn(frame, 66, 84);
+  const words: [string, boolean][] = [
+    ["Give", false],
+    ["your", false],
+    ["AI", false],
+    ["agent", false],
+    ["its", false],
+    ["own", false],
+    ["Windows", true],
+    ["machine.", true],
+  ];
+  const underline = ease(frame, [58, 82], [0, 1]);
+  const sub = useEnter(70, 16);
 
   return (
-    <AbsoluteFill style={{ ...center, flexDirection: "column", padding: 80 }}>
-      <Kicker color={theme.rose} o={k}>
-        The problem
-      </Kicker>
-
-      <h1
-        style={{
-          opacity: h.opacity,
-          transform: `translateY(${h.translateY}px)`,
-          fontSize: 56,
-          lineHeight: 1.08,
-          fontWeight: 800,
-          margin: "26px 0 0",
-          maxWidth: 1000,
-          letterSpacing: -0.5,
-        }}
-      >
-        AI agents can code, run terminals,
-        <br />
-        use tools&nbsp;
-        <span style={{ color: theme.inkFaint }}>— until they hit Windows.</span>
+    <AbsoluteFill style={{ ...center, padding: sp(12) }}>
+      <div style={{ marginBottom: sp(4) }}>
+        <Kicker delay={2}>WinReach</Kicker>
+      </div>
+      <h1 style={{ ...H, fontSize: 74, maxWidth: 1180, textAlign: "center" }}>
+        {words.map(([w, a], i) => (
+          <Word key={i} delay={8 + i * 4} accent={a}>
+            {w}
+          </Word>
+        ))}
       </h1>
-
+      {/* Amber underline sweeps under the accent phrase. */}
+      <div
+        style={{
+          height: 4,
+          width: 356 * underline,
+          maxWidth: 356,
+          background: theme.amber,
+          borderRadius: 4,
+          marginTop: sp(1),
+          boxShadow: `0 0 18px ${theme.amberGlow}`,
+          alignSelf: "center",
+        }}
+      />
       <p
         style={{
           opacity: sub.opacity,
           transform: `translateY(${sub.translateY}px)`,
-          fontSize: 24,
-          color: theme.inkSoft,
-          margin: "22px 0 0",
-          maxWidth: 760,
-          lineHeight: 1.4,
+          marginTop: sp(4),
+          fontSize: 27,
+          color: theme.inkMute,
+          maxWidth: 820,
+          lineHeight: 1.45,
         }}
       >
-        RDP traps them behind a GUI — squinting at screenshots, nudging a mouse.
+        Remote PowerShell, screen capture, and full desktop control —{" "}
+        <span style={{ color: theme.inkSoft }}>over HTTP.</span>
       </p>
+    </AbsoluteFill>
+  );
+};
 
-      {/* The trapped-in-a-GUI motif: a mock RDP window that draws itself in,
-          then a lock settles over it. */}
-      <div
+// ═════════════════════════════════════════════════════════════════════════
+// Scene 2 — Connect over HTTP
+// ═════════════════════════════════════════════════════════════════════════
+
+const SceneHeader: React.FC<{ kicker: string; children: React.ReactNode }> = ({
+  kicker,
+  children,
+}) => {
+  const h = useEnter(12, 18);
+  return (
+    <div style={{ textAlign: "center", marginBottom: sp(4.5) }}>
+      <Kicker delay={2}>{kicker}</Kicker>
+      <h2
         style={{
-          marginTop: 48,
-          width: 480,
-          height: 150,
-          position: "relative",
-          // draw effect: window reveals left-to-right
-          clipPath: `inset(0 ${(1 - draw) * 100}% 0 0 round 12px)`,
+          ...H,
+          fontSize: 40,
+          marginTop: sp(2),
+          opacity: h.opacity,
+          transform: `translateY(${h.translateY}px)`,
         }}
       >
+        {children}
+      </h2>
+    </div>
+  );
+};
+
+const HandshakeBar: React.FC = () => {
+  const frame = useCurrentFrame();
+  const e = useEnter(96, 14);
+  // A pulse travels agent → server each ~40 frames.
+  const t = ((frame - 96) % 46) / 46;
+  const pulseX = interpolate(t, [0, 1], [0, 1]);
+  const connected = frame > 128;
+  return (
+    <div
+      style={{
+        opacity: e.opacity,
+        transform: `translateY(${e.translateY}px)`,
+        display: "flex",
+        alignItems: "center",
+        gap: sp(2),
+        marginTop: sp(3),
+      }}
+    >
+      <Node label="Your agent" sub="Claude Code" />
+      <div style={{ position: "relative", width: 240, height: 40 }}>
         <div
           style={{
             position: "absolute",
-            inset: 0,
-            border: `2px solid ${theme.rose}66`,
-            borderRadius: 12,
-            overflow: "hidden",
-            background: "rgba(255,255,255,0.02)",
-            boxShadow: `0 0 44px ${theme.roseSoft}`,
+            top: 19,
+            left: 0,
+            right: 0,
+            height: 2,
+            background: theme.lineStrong,
           }}
-        >
-          {/* fake RDP title bar */}
+        />
+        {frame > 96 && frame < 128 && (
           <div
             style={{
-              height: 30,
-              background: "rgba(255,255,255,0.06)",
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "0 12px",
+              position: "absolute",
+              top: 14,
+              left: `calc(${pulseX * 100}% - 6px)`,
+              width: 12,
+              height: 12,
+              borderRadius: 12,
+              background: theme.amber,
+              boxShadow: `0 0 16px ${theme.amberGlow}`,
             }}
-          >
-            <span style={{ width: 9, height: 9, borderRadius: 9, background: theme.rose }} />
-            <span style={{ width: 9, height: 9, borderRadius: 9, background: theme.inkFaint }} />
-            <span style={{ width: 9, height: 9, borderRadius: 9, background: theme.inkFaint }} />
-            <span style={{ fontSize: 13, color: theme.inkFaint, marginLeft: 6 }}>
-              Remote Desktop — win-build-01
-            </span>
-          </div>
-          {/* blurred desktop content the agent can only stare at */}
-          <div style={{ padding: 14, display: "flex", flexDirection: "column", gap: 9, filter: "blur(0.4px)" }}>
-            <div style={{ height: 10, width: "70%", borderRadius: 5, background: "rgba(255,255,255,0.10)" }} />
-            <div style={{ height: 10, width: "52%", borderRadius: 5, background: "rgba(255,255,255,0.08)" }} />
-            <div style={{ height: 10, width: "61%", borderRadius: 5, background: "rgba(255,255,255,0.06)" }} />
-          </div>
-        </div>
-
-        {/* lock + friction caption settle over the window */}
+          />
+        )}
         <div
           style={{
             position: "absolute",
-            inset: 0,
+            top: -6,
+            left: "50%",
+            transform: "translateX(-50%)",
+            fontFamily: theme.fontMono,
+            fontSize: 13,
+            color: connected ? theme.green : theme.inkMute,
+            whiteSpace: "nowrap",
+          }}
+        >
+          {connected ? "200 OK · Bearer ✓" : "HTTP · Bearer …"}
+        </div>
+      </div>
+      <Node label="WinReach" sub="win-build-01" accent />
+    </div>
+  );
+};
+
+const Node: React.FC<{ label: string; sub: string; accent?: boolean }> = ({
+  label,
+  sub,
+  accent,
+}) => (
+  <div
+    style={{
+      padding: "12px 20px",
+      borderRadius: 12,
+      background: accent ? theme.amberSoft : theme.surface,
+      border: `1px solid ${accent ? "rgba(250,204,21,0.4)" : theme.line}`,
+      textAlign: "center",
+      minWidth: 150,
+    }}
+  >
+    <div style={{ fontSize: 19, fontWeight: 700, color: accent ? theme.amber : theme.ink }}>
+      {label}
+    </div>
+    <div style={{ fontFamily: theme.fontMono, fontSize: 14, color: theme.inkMute, marginTop: 3 }}>
+      {sub}
+    </div>
+  </div>
+);
+
+export const SceneConnect: React.FC = () => {
+  const term = useEnter(14, 20);
+  return (
+    <AbsoluteFill style={{ ...center, padding: "56px 80px" }}>
+      <SceneHeader kicker="01 · Connect">
+        One line to reach your Windows box.
+      </SceneHeader>
+
+      <div
+        style={{
+          opacity: term.opacity,
+          transform: `translateY(${term.translateY}px) scale(${term.scale})`,
+        }}
+      >
+        <WindowChrome title="agent · terminal" width={1000} accent>
+          <TermBody minHeight={196}>
+            <CmdLine
+              prompt="$"
+              promptColor={theme.green}
+              text='claude mcp add --transport http winreach \'
+              start={16}
+              cps={2.6}
+              render={psHighlight}
+            />
+            <CmdLine
+              prompt=" "
+              promptColor="transparent"
+              text='  https://win-build-01.trycloudflare.com/mcp \'
+              start={40}
+              cps={2.6}
+              render={(t) => <span style={{ color: theme.cyan }}>{t}</span>}
+            />
+            <CmdLine
+              prompt=" "
+              promptColor="transparent"
+              text='  --header "Authorization: Bearer wr_live_a91f…"'
+              start={62}
+              cps={2.6}
+              render={psHighlight}
+            />
+            <OutLine at={92} color={theme.inkMute}>
+              Connecting over Streamable HTTP…
+            </OutLine>
+            <OutLine at={112} color={theme.green} bold>
+              ✓ Connected · 8 tools available
+            </OutLine>
+          </TermBody>
+        </WindowChrome>
+      </div>
+
+      <HandshakeBar />
+    </AbsoluteFill>
+  );
+};
+
+// ═════════════════════════════════════════════════════════════════════════
+// Scene 3 — Run PowerShell remotely
+// ═════════════════════════════════════════════════════════════════════════
+
+export const ScenePowerShell: React.FC = () => {
+  const frame = useCurrentFrame();
+  const term = useEnter(14, 20);
+  return (
+    <AbsoluteFill style={{ ...center, padding: "56px 80px" }}>
+      <SceneHeader kicker="02 · Run">Run real PowerShell, remotely.</SceneHeader>
+
+      <div style={{ marginBottom: sp(2.5), display: "flex", gap: sp(1.5) }}>
+        <ToolCall tool="powershell_execute" delay={20} status={frame > 96 ? "ok" : "run"} />
+      </div>
+
+      <div
+        style={{
+          opacity: term.opacity,
+          transform: `translateY(${term.translateY}px) scale(${term.scale})`,
+        }}
+      >
+        <WindowChrome title="Windows PowerShell — win-build-01" width={1000}>
+          <TermBody minHeight={244}>
+            <CmdLine
+              text="Get-CimInstance Win32_OperatingSystem | Select Caption, CsName"
+              start={30}
+              cps={2.1}
+              caretIdle
+              render={psHighlight}
+            />
+            <div style={{ height: sp(1.5) }} />
+            <OutLine at={96} color={theme.inkFaint}>
+              Caption                                CsName
+            </OutLine>
+            <OutLine at={102} color={theme.inkFaint}>
+              -------                                ------
+            </OutLine>
+            <OutLine at={110} color={theme.inkSoft}>
+              Microsoft Windows 11 Pro               WIN-BUILD-01
+            </OutLine>
+            <div style={{ height: sp(1.5) }} />
+            <OutLine at={130} color={theme.inkMute}>
+              exitCode 0 · 143 ms
+            </OutLine>
+          </TermBody>
+        </WindowChrome>
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+// ═════════════════════════════════════════════════════════════════════════
+// Scene 4 — Computer use (the standout)
+// ═════════════════════════════════════════════════════════════════════════
+
+// Cursor keyframes in desktop-local coordinates.
+const CUR = {
+  start: { x: 880, y: 90, f: 30 },
+  overText: { x: 250, y: 250, f: 62 }, // arrives over the editor
+  click: 66,
+  typeStart: 82,
+};
+
+const ActionChip: React.FC<{ label: string; delay: number; active: boolean }> = ({
+  label,
+  delay,
+  active,
+}) => {
+  const e = useEnter(delay, 8);
+  return (
+    <div
+      style={{
+        opacity: e.opacity,
+        transform: `translateX(${(1 - e.progress) * 14}px)`,
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "9px 14px",
+        borderRadius: 10,
+        background: active ? theme.amberSoft : theme.surface,
+        border: `1px solid ${active ? "rgba(250,204,21,0.45)" : theme.line}`,
+        fontFamily: theme.fontMono,
+        fontSize: 15,
+        color: active ? theme.ink : theme.inkMute,
+        transition: "none",
+      }}
+    >
+      <span
+        style={{
+          width: 7,
+          height: 7,
+          borderRadius: 7,
+          background: active ? theme.amber : theme.inkFaint,
+          boxShadow: active ? `0 0 10px ${theme.amberGlow}` : "none",
+        }}
+      />
+      {label}
+    </div>
+  );
+};
+
+export const SceneComputerUse: React.FC = () => {
+  const frame = useCurrentFrame();
+  const desk = useEnter(6, 24);
+
+  // Cursor position (eased between keyframes).
+  const t = ease(frame, [CUR.start.f, CUR.overText.f], [0, 1], EASE_OUT);
+  const curX = interpolate(t, [0, 1], [CUR.start.x, CUR.overText.x]);
+  const curY = interpolate(t, [0, 1], [CUR.start.y, CUR.overText.y]);
+  const pressed = frame >= CUR.click && frame < CUR.click + 8;
+  const ripple = interpolate(frame, [CUR.click, CUR.click + 22], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+
+  const typed = useTyped("Hi — your agent is typing this, on Windows.", CUR.typeStart, 1.4);
+  const editorCaret = useCaret(18);
+  const cursorVisible = fadeIn(frame, 26, 34);
+
+  return (
+    <AbsoluteFill style={{ ...center, padding: "44px 70px" }}>
+      <SceneHeader kicker="03 · Computer use">
+        And drive the desktop like a human.
+      </SceneHeader>
+
+      <div style={{ display: "flex", gap: sp(3), alignItems: "stretch" }}>
+        {/* The mock Windows desktop */}
+        <div
+          style={{
+            opacity: desk.opacity,
+            transform: `translateY(${desk.translateY}px) scale(${desk.scale})`,
+          }}
+        >
+          <WindowChrome title="take_screenshot · WIN-BUILD-01 · 1920×1080" width={860}>
+            <div
+              style={{
+                position: "relative",
+                height: 430,
+                overflow: "hidden",
+                textAlign: "left",
+                background:
+                  "radial-gradient(120% 100% at 20% 0%, #14213a 0%, #0c1120 55%, #070a12 100%)",
+              }}
+            >
+              {/* editor window */}
+              <div
+                style={{
+                  position: "absolute",
+                  left: 150,
+                  top: 74,
+                  width: 520,
+                  borderRadius: 12,
+                  overflow: "hidden",
+                  background: "rgba(10,11,16,0.98)",
+                  border: `1px solid ${theme.lineStrong}`,
+                  boxShadow: "0 30px 70px rgba(0,0,0,0.55)",
+                }}
+              >
+                <div
+                  style={{
+                    height: 40,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "0 14px",
+                    background: "rgba(255,255,255,0.045)",
+                    borderBottom: `1px solid ${theme.line}`,
+                  }}
+                >
+                  <span style={{ width: 11, height: 11, borderRadius: 11, background: "#ff5f57" }} />
+                  <span style={{ width: 11, height: 11, borderRadius: 11, background: "#febc2e" }} />
+                  <span style={{ width: 11, height: 11, borderRadius: 11, background: "#28c840" }} />
+                  <span
+                    style={{
+                      marginLeft: 10,
+                      fontFamily: theme.fontMono,
+                      fontSize: 13,
+                      color: theme.inkMute,
+                    }}
+                  >
+                    agent-notes.txt — Notepad
+                  </span>
+                </div>
+                <div
+                  style={{
+                    padding: "22px 20px",
+                    minHeight: 190,
+                    fontFamily: theme.fontMono,
+                    fontSize: 19,
+                    lineHeight: 1.6,
+                    color: theme.ink,
+                  }}
+                >
+                  {typed}
+                  {frame >= CUR.typeStart && editorCaret && (
+                    <span style={{ color: theme.amber }}>▋</span>
+                  )}
+                </div>
+              </div>
+
+              {/* taskbar */}
+              <div
+                style={{
+                  position: "absolute",
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  height: 46,
+                  background: "rgba(10,12,20,0.72)",
+                  backdropFilter: "blur(8px)",
+                  borderTop: `1px solid ${theme.line}`,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: 20,
+                }}
+              >
+                {[theme.cyan, theme.inkSoft, theme.inkSoft, theme.amber].map((c, i) => (
+                  <span
+                    key={i}
+                    style={{
+                      width: 22,
+                      height: 22,
+                      borderRadius: 6,
+                      background: i === 0 ? c : theme.surfaceUp,
+                      border: `1px solid ${theme.line}`,
+                    }}
+                  />
+                ))}
+                <span
+                  style={{
+                    position: "absolute",
+                    right: 16,
+                    fontFamily: theme.fontMono,
+                    fontSize: 13,
+                    color: theme.inkMute,
+                  }}
+                >
+                  9:41
+                </span>
+              </div>
+
+              {/* click ripple + cursor live in desktop coordinate space */}
+              <ClickRipple x={CUR.overText.x} y={CUR.overText.y} p={ripple} />
+              <Cursor x={curX} y={curY} opacity={cursorVisible} pressed={pressed} />
+            </div>
+          </WindowChrome>
+        </div>
+
+        {/* live action log */}
+        <div
+          style={{
             display: "flex",
             flexDirection: "column",
             justifyContent: "center",
-            alignItems: "center",
-            gap: 8,
-            opacity: lock,
-            background: "rgba(11,14,22,0.55)",
-            borderRadius: 12,
+            gap: sp(1.5),
+            width: 230,
           }}
         >
-          <div style={{ fontSize: 34 }}>🔒</div>
-          <div style={{ fontFamily: theme.fontMono, fontSize: 16, color: theme.rose, fontWeight: 600 }}>
-            screenshots&nbsp;·&nbsp;mouse&nbsp;·&nbsp;RDP
+          <div
+            style={{
+              fontFamily: theme.fontMono,
+              fontSize: 13,
+              letterSpacing: 2,
+              textTransform: "uppercase",
+              color: theme.inkFaint,
+              marginBottom: sp(0.5),
+            }}
+          >
+            computer_use
           </div>
+          <ActionChip label="move → 250,250" delay={CUR.start.f + 4} active={frame >= CUR.start.f + 4} />
+          <ActionChip label="click left" delay={CUR.click} active={frame >= CUR.click} />
+          <ActionChip label='type "Hi…"' delay={CUR.typeStart} active={frame >= CUR.typeStart} />
+          <ActionChip label="Win32 SendInput" delay={CUR.typeStart + 30} active={frame >= CUR.typeStart + 30} />
         </div>
       </div>
     </AbsoluteFill>
   );
 };
 
-// ─────────────────────────────────────────────────────────────────────────
-// Scene 2 — The Solution (pipeline)
-// ─────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════
+// Scene 5 — Security
+// ═════════════════════════════════════════════════════════════════════════
 
-const PipeNode: React.FC<{
+const IconKey = (
+  <>
+    <circle cx="8" cy="8" r="4" />
+    <path d="M11 11 L20 20 M17 17 l2 2 M15 19 l2 2" />
+  </>
+);
+const IconShield = (
+  <>
+    <path d="M12 3 L20 6 V12 C20 17 16 20 12 21 C8 20 4 17 4 12 V6 Z" />
+    <path d="M9 12 l2 2 l4 -4" />
+  </>
+);
+const IconPolicy = (
+  <>
+    <rect x="5" y="4" width="14" height="17" rx="2" />
+    <path d="M8 9 h8 M8 13 h8 M8 17 h5" />
+  </>
+);
+const IconAudit = (
+  <>
+    <path d="M12 3 a9 9 0 1 0 0.01 0" />
+    <path d="M12 7 v5 l3 2" />
+  </>
+);
+
+const SecCard: React.FC<{
+  icon: React.ReactNode;
   title: string;
   sub: string;
-  color: string;
-  frame: number;
-  appear: number;
-  emphasize?: boolean;
-}> = ({ title, sub, color, frame, appear, emphasize }) => {
-  const { fps } = useVideoConfig();
-  // Spring-driven entrance: physically natural pop preferred by Remotion docs.
-  const s = spring({
-    frame: frame - appear,
-    fps,
-    config: { damping: 16, stiffness: 110, mass: 0.8 },
-  });
+  delay: number;
+}> = ({ icon, title, sub, delay }) => {
+  const s = useSpringAt(delay);
   const opacity = interpolate(s, [0, 1], [0, 1]);
-  const translateY = interpolate(s, [0, 1], [22, 0]);
-  const scale = interpolate(s, [0, 1], [0.92, 1]);
+  const y = interpolate(s, [0, 1], [26, 0]);
+  const scale = interpolate(s, [0, 1], [0.94, 1]);
   return (
     <div
       style={{
         opacity,
-        transform: `translateY(${translateY}px) scale(${scale})`,
-        width: 250,
-        padding: "26px 22px",
+        transform: `translateY(${y}px) scale(${scale})`,
+        width: 268,
+        padding: sp(3),
         borderRadius: 16,
-        background: emphasize ? `${color}1f` : "rgba(255,255,255,0.03)",
-        border: `1.5px solid ${emphasize ? color : "rgba(255,255,255,0.12)"}`,
-        boxShadow: emphasize ? `0 0 44px ${color}33` : "none",
-        textAlign: "center",
+        background: theme.surface,
+        border: `1px solid ${theme.line}`,
+        textAlign: "left",
       }}
     >
-      <div style={{ fontSize: 26, fontWeight: 800, color: emphasize ? color : theme.ink }}>
-        {title}
+      <div
+        style={{
+          width: 48,
+          height: 48,
+          borderRadius: 12,
+          background: theme.amberSoft,
+          border: `1px solid rgba(250,204,21,0.35)`,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          marginBottom: sp(2),
+        }}
+      >
+        <svg
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke={theme.amber}
+          strokeWidth="1.7"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          {icon}
+        </svg>
       </div>
-      <div style={{ fontSize: 17, color: theme.inkSoft, marginTop: 8, lineHeight: 1.35 }}>
+      <div style={{ fontSize: 22, fontWeight: 700, color: theme.ink }}>{title}</div>
+      <div style={{ fontSize: 16, color: theme.inkMute, marginTop: sp(1), lineHeight: 1.4 }}>
         {sub}
       </div>
     </div>
   );
 };
 
-const Connector: React.FC<{ frame: number; appear: number; color: string }> = ({
-  frame,
-  appear,
-  color,
-}) => {
-  const grow = interpolate(frame, [appear, appear + 14], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.inOut(Easing.cubic),
-  });
+export const SceneSecurity: React.FC = () => {
   return (
-    <div style={{ width: 70, display: "flex", alignItems: "center", justifyContent: "center" }}>
-      <div style={{ width: "100%", position: "relative", height: 22 }}>
-        <div
-          style={{
-            position: "absolute",
-            top: 10,
-            left: 0,
-            height: 3,
-            width: `${grow * 100}%`,
-            background: color,
-            borderRadius: 3,
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            top: 4,
-            left: `calc(${grow * 100}% - 8px)`,
-            width: 0,
-            height: 0,
-            borderTop: "8px solid transparent",
-            borderBottom: "8px solid transparent",
-            borderLeft: `9px solid ${color}`,
-            opacity: grow,
-          }}
-        />
-      </div>
-    </div>
-  );
-};
-
-export const SceneSolution: React.FC = () => {
-  const frame = useCurrentFrame();
-  const k = fadeIn(frame, 4, 18);
-  const h = rise(frame, 12, 32);
-
-  return (
-    <AbsoluteFill style={{ ...center, flexDirection: "column", padding: 80 }}>
-      <Kicker color={theme.teal} o={k}>
-        The solution
-      </Kicker>
-
-      <h1
-        style={{
-          opacity: h.opacity,
-          transform: `translateY(${h.translateY}px)`,
-          fontSize: 50,
-          fontWeight: 800,
-          margin: "24px 0 8px",
-          maxWidth: 900,
-          letterSpacing: -0.5,
-          lineHeight: 1.1,
-        }}
-      >
-        WinReach makes Windows an{" "}
-        <span style={{ color: theme.teal }}>MCP-native</span> target.
-      </h1>
-
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          marginTop: 56,
-        }}
-      >
-        <PipeNode
-          frame={frame}
-          appear={40}
-          title="AI Agent"
-          sub="Codex · Claude Code"
-          color={theme.blue}
-        />
-        <Connector frame={frame} appear={56} color={theme.inkFaint} />
-        <PipeNode
-          frame={frame}
-          appear={62}
-          title="WinReach"
-          sub="MCP server · PowerShell tools"
-          color={theme.teal}
-          emphasize
-        />
-        <Connector frame={frame} appear={78} color={theme.inkFaint} />
-        <PipeNode
-          frame={frame}
-          appear={84}
-          title="Windows"
-          sub="Headless PowerShell"
-          color={theme.amber}
-        />
+    <AbsoluteFill style={{ ...center, padding: "56px 80px" }}>
+      <SceneHeader kicker="04 · Secured by default">
+        Every agent, locked to its own key.
+      </SceneHeader>
+      <div style={{ display: "flex", gap: sp(2.5), flexWrap: "wrap", justifyContent: "center" }}>
+        <SecCard icon={IconKey} title="Per-user keys" sub="A distinct bearer token per agent — hashed at rest." delay={14} />
+        <SecCard icon={IconShield} title="Roles" sub="admin · operator · readonly scope every principal." delay={22} />
+        <SecCard icon={IconPolicy} title="Command policy" sub="Regex allow / deny lists gate every command." delay={30} />
+        <SecCard icon={IconAudit} title="Audit log" sub="Append-only JSONL record of every tool call." delay={38} />
       </div>
     </AbsoluteFill>
   );
 };
 
-// ─────────────────────────────────────────────────────────────────────────
-// Scene 3 — The one command (hero terminal)
-// ─────────────────────────────────────────────────────────────────────────
+// ═════════════════════════════════════════════════════════════════════════
+// Scene 6 — End card
+// ═════════════════════════════════════════════════════════════════════════
 
-type TLine =
-  | { kind: "cmd"; text: string; start: number }
-  | { kind: "out"; text: string; at: number; color?: string };
-
-const TUNNEL = "https://swift-river-7s3d.trycloudflare.com/mcp";
-
-const heroLines: TLine[] = [
-  { kind: "cmd", text: "$env:WINREACH_TUNNEL = 'cloudflare'", start: 18 },
-  { kind: "cmd", text: "npm run dev", start: 62 },
-  { kind: "out", text: "WinReach MCP listening on http://127.0.0.1:7573/mcp", at: 90 },
-  { kind: "out", text: "Cloudflare tunnel ready:", at: 108 },
-  { kind: "out", text: TUNNEL, at: 120, color: theme.green },
-];
-
-const TypedCmd: React.FC<{ text: string; start: number }> = ({ text, start }) => {
+export const SceneEnd: React.FC = () => {
   const frame = useCurrentFrame();
-  const typed = useTyped(text, start, 1.8);
-  const typing = isAfter(frame, start) && typed.length < text.length;
-  const caretOn = Math.floor(frame / 8) % 2 === 0;
-  if (!isAfter(frame, start)) return null;
-  return (
-    <div style={{ display: "flex", gap: 12, whiteSpace: "pre" }}>
-      <span style={{ color: theme.teal, fontWeight: 700 }}>PS&gt;</span>
-      <span>
-        {typed}
-        {(typing || caretOn) && (
-          <span style={{ color: theme.teal, opacity: typing ? 1 : caretOn ? 0.8 : 0 }}>▋</span>
-        )}
-      </span>
-    </div>
-  );
-};
-
-const OutLine: React.FC<{ text: string; at: number; color?: string }> = ({ text, at, color }) => {
-  const frame = useCurrentFrame();
-  const o = fadeIn(frame, at, at + 8);
-  if (!isAfter(frame, at)) return null;
-  return (
-    <div
-      style={{
-        opacity: o,
-        margin: "4px 0 4px 40px",
-        color: color ?? theme.inkSoft,
-        whiteSpace: "pre-wrap",
-        wordBreak: "break-all",
-        fontWeight: color ? 700 : 400,
-      }}
-    >
-      {text}
-    </div>
-  );
-};
-
-export const SceneCommand: React.FC = () => {
-  const frame = useCurrentFrame();
-  const { fps } = useVideoConfig();
-  const k = fadeIn(frame, 4, 18);
-  const h = rise(frame, 10, 28);
-
-  const termSpring = spring({ frame: frame - 14, fps, config: { damping: 18, stiffness: 90 } });
-  const termScale = interpolate(termSpring, [0, 1], [0.96, 1]);
-  const termOpacity = interpolate(termSpring, [0, 1], [0, 1]);
-
-  // highlight pulse on the URL once it's printed
-  const urlGlow = interpolate(frame, [128, 150], [0, 1], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
+  const mark = useEnter(6, 20);
+  const tag = useEnter(24, 16);
+  const cmd = useEnter(40, 14);
+  const repo = fadeIn(frame, 56, 74);
 
   return (
-    <AbsoluteFill style={{ ...center, flexDirection: "column", padding: "56px 80px" }}>
-      <Kicker color={theme.amber} o={k}>
-        One command
-      </Kicker>
-
-      <h1
+    <AbsoluteFill style={{ ...center, padding: sp(10) }}>
+      <div
         style={{
-          opacity: h.opacity,
-          transform: `translateY(${h.translateY}px)`,
-          fontSize: 42,
+          opacity: mark.opacity,
+          transform: `translateY(${mark.translateY}px) scale(${mark.scale})`,
+          fontSize: 88,
           fontWeight: 800,
-          margin: "20px 0 32px",
-          letterSpacing: -0.5,
+          letterSpacing: -2,
         }}
       >
-        Publish the host to your agent — <span style={{ color: theme.amber }}>from anywhere.</span>
-      </h1>
-
-      <div
-        style={{
-          width: 920,
-          transform: `scale(${termScale})`,
-          opacity: termOpacity,
-          background: "rgba(4,6,11,0.96)",
-          border: "1px solid rgba(255,255,255,0.14)",
-          borderRadius: 14,
-          overflow: "hidden",
-          boxShadow: "0 34px 90px rgba(0,0,0,0.55)",
-        }}
-      >
-        <div
-          style={{
-            height: 44,
-            background: "#171c2b",
-            display: "flex",
-            alignItems: "center",
-            gap: 9,
-            padding: "0 18px",
-          }}
-        >
-          <span style={{ width: 13, height: 13, borderRadius: 13, background: theme.rose }} />
-          <span style={{ width: 13, height: 13, borderRadius: 13, background: theme.amber }} />
-          <span style={{ width: 13, height: 13, borderRadius: 13, background: theme.green }} />
-          <span style={{ color: theme.inkFaint, fontSize: 15, marginLeft: 10 }}>
-            Windows PowerShell — winreach
-          </span>
-        </div>
-        <div
-          style={{
-            padding: "26px 30px",
-            fontFamily: theme.fontMono,
-            fontSize: 21,
-            lineHeight: 1.6,
-            minHeight: 240,
-            position: "relative",
-            textAlign: "left",
-          }}
-        >
-          {/* glow behind the URL line */}
-          <div
-            style={{
-              position: "absolute",
-              left: 24,
-              right: 24,
-              bottom: 24,
-              height: 40,
-              background: `${theme.green}22`,
-              borderRadius: 8,
-              opacity: urlGlow,
-              filter: "blur(2px)",
-            }}
-          />
-          <div style={{ position: "relative" }}>
-            {heroLines.map((l, i) =>
-              l.kind === "cmd" ? (
-                <TypedCmd key={i} text={l.text} start={l.start} />
-              ) : (
-                <OutLine key={i} text={l.text} at={l.at} color={l.color} />
-              )
-            )}
-          </div>
-        </div>
-      </div>
-    </AbsoluteFill>
-  );
-};
-
-// ─────────────────────────────────────────────────────────────────────────
-// Scene 4 — The Payoff
-// ─────────────────────────────────────────────────────────────────────────
-
-const PayoffCmd: React.FC<{
-  cmd: string;
-  out: string;
-  appear: number;
-  outAt: number;
-  outColor?: string;
-}> = ({ cmd, out, appear, outAt, outColor }) => {
-  const frame = useCurrentFrame();
-  const r = rise(frame, appear, appear + 14, 14);
-  const outO = fadeIn(frame, outAt, outAt + 8);
-  return (
-    <div
-      style={{
-        opacity: r.opacity,
-        transform: `translateY(${r.translateY}px)`,
-        fontFamily: theme.fontMono,
-        fontSize: 22,
-        lineHeight: 1.5,
-        marginBottom: 18,
-      }}
-    >
-      <div style={{ display: "flex", gap: 10 }}>
-        <span style={{ color: theme.teal, fontWeight: 700 }}>$</span>
-        <span>{cmd}</span>
-      </div>
-      <div style={{ opacity: outO, marginLeft: 26, color: outColor ?? theme.green, fontWeight: 600 }}>
-        {out}
-      </div>
-    </div>
-  );
-};
-
-export const ScenePayoff: React.FC = () => {
-  const frame = useCurrentFrame();
-  const k = fadeIn(frame, 4, 18);
-  const h = rise(frame, 12, 30);
-
-  const tagline = rise(frame, 96, 120, 18);
-
-  return (
-    <AbsoluteFill style={{ ...center, flexDirection: "column", padding: 80 }}>
-      <Kicker color={theme.green} o={k}>
-        The payoff
-      </Kicker>
-
-      <h1
-        style={{
-          opacity: h.opacity,
-          transform: `translateY(${h.translateY}px)`,
-          fontSize: 44,
-          fontWeight: 800,
-          margin: "22px 0 36px",
-          letterSpacing: -0.5,
-        }}
-      >
-        The agent runs real commands — <span style={{ color: theme.green }}>headlessly.</span>
-      </h1>
-
-      <div
-        style={{
-          width: 760,
-          background: "rgba(4,6,11,0.6)",
-          border: "1px solid rgba(255,255,255,0.1)",
-          borderRadius: 14,
-          padding: "28px 34px",
-          textAlign: "left",
-        }}
-      >
-        <PayoffCmd cmd="npm run client -- exec hostname" out="win-build-01" appear={34} outAt={54} />
-        <PayoffCmd
-          cmd="npm run client -- exec whoami"
-          out="win-build-01\agent"
-          appear={64}
-          outAt={84}
-          outColor={theme.blue}
-        />
+        Win<span style={{ color: theme.amber }}>Reach</span>
       </div>
 
-      <div
+      <p
         style={{
-          opacity: tagline.opacity,
-          transform: `translateY(${tagline.translateY}px)`,
-          marginTop: 40,
+          opacity: tag.opacity,
+          transform: `translateY(${tag.translateY}px)`,
           fontSize: 30,
-          fontWeight: 800,
-          letterSpacing: -0.3,
+          color: theme.inkSoft,
+          margin: `${sp(3)}px 0 0`,
+          maxWidth: 820,
+          lineHeight: 1.4,
         }}
       >
-        No screenshots. No RDP.{" "}
-        <span style={{ color: theme.teal }}>Just MCP tools — reachable from anywhere.</span>
+        Give your AI agent its own Windows machine.
+      </p>
+
+      <div
+        style={{
+          opacity: cmd.opacity,
+          transform: `translateY(${cmd.translateY}px) scale(${cmd.scale})`,
+          marginTop: sp(5),
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 14,
+          padding: "16px 26px",
+          borderRadius: 12,
+          background: theme.surface,
+          border: `1px solid rgba(250,204,21,0.4)`,
+          fontFamily: theme.fontMono,
+          fontSize: 26,
+        }}
+      >
+        <span style={{ color: theme.amber }}>$</span>
+        <span style={{ color: theme.ink }}>npx winreach-mcp</span>
+      </div>
+
+      <div
+        style={{
+          opacity: repo,
+          marginTop: sp(4),
+          fontFamily: theme.fontMono,
+          fontSize: 20,
+          color: theme.inkMute,
+        }}
+      >
+        github.com/GhouI/winreach-mcp
       </div>
     </AbsoluteFill>
   );

@@ -15,15 +15,11 @@ Agent or MCP client  ->  WinReach MCP over HTTP  ->  Windows (PowerShell + deskt
 
 ## Demo
 
-[![WinReach demo poster](assets/winreach-demo.png)](assets/winreach-demo.mp4)
+[![WinReach demo](assets/winreach-demo.gif)](assets/winreach-demo.mp4)
 
-Watch the generated demo video: [assets/winreach-demo.mp4](assets/winreach-demo.mp4)
+Connect an agent over HTTP, run remote PowerShell, drive the Windows desktop, and keep every action behind per-user keys — in about 30 seconds.
 
-The demo is rendered with [Remotion](https://www.remotion.dev/) from the source in [video/](video/). Re-render it locally with:
-
-```powershell
-npm run video:render
-```
+▶ **[Watch the full-quality MP4](assets/winreach-demo.mp4)** · built with [Remotion](https://www.remotion.dev/) (source and re-render steps in [video/](video/README.md)).
 
 ## Why WinReach?
 
