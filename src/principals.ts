@@ -1,16 +1,18 @@
-import { timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { compilePatterns, type CommandPolicy } from "./policy.js";
 
 /**
- * A principal is an authenticated identity. Each principal has its own bearer
- * token, a display name and role (for audit logging and authorization), and an
- * optional per-principal command policy that further restricts what the
- * principal may run on top of the global policy.
+ * A principal is an authenticated identity with a display name and role (for
+ * audit/authorization) and an optional per-principal command policy. Its bearer
+ * credential is either a plaintext `token`, or a `tokenHash` (SHA-256 hex of the
+ * token) for keys issued by an external store that never shares the plaintext —
+ * in which case a presented token authenticates when its SHA-256 matches.
  */
 export type Principal = {
   name: string;
   role: string;
-  token: string;
+  token?: string;
+  tokenHash?: string;
   policy: CommandPolicy;
 };
 
@@ -20,6 +22,7 @@ type RawPrincipal = {
   role?: unknown;
   token?: unknown;
   tokenEnv?: unknown;
+  tokenHash?: unknown;
   allow?: unknown;
   deny?: unknown;
 };
@@ -77,8 +80,9 @@ export function parsePrincipals(raw: string, env: Record<string, string | undefi
     const role = typeof raw.role === "string" && raw.role.trim() ? raw.role.trim() : "user";
 
     const token = resolveToken(raw, env, path);
-    if (!token) {
-      throw new Error(`${path} must define a non-empty "token" or "tokenEnv"`);
+    const tokenHash = parseTokenHash(raw, path);
+    if (!token && !tokenHash) {
+      throw new Error(`${path} must define a non-empty "token", "tokenEnv", or "tokenHash"`);
     }
 
     const policy: CommandPolicy = {
@@ -86,8 +90,19 @@ export function parsePrincipals(raw: string, env: Record<string, string | undefi
       deny: compilePatterns(asStringArray(raw.deny, `${path}.deny`), `${path}.deny`)
     };
 
-    return { name, role, token, policy };
+    return { name, role, token, tokenHash, policy };
   });
+}
+
+/** Validate an optional `tokenHash` (64-char hex SHA-256), normalized to lowercase. */
+function parseTokenHash(raw: RawPrincipal, path: string): string | undefined {
+  if (raw.tokenHash === undefined) {
+    return undefined;
+  }
+  if (typeof raw.tokenHash !== "string" || !/^[0-9a-f]{64}$/i.test(raw.tokenHash.trim())) {
+    throw new Error(`${path}.tokenHash must be a 64-character hex SHA-256 string`);
+  }
+  return raw.tokenHash.trim().toLowerCase();
 }
 
 function resolveToken(raw: RawPrincipal, env: Record<string, string | undefined>, path: string): string | undefined {
@@ -109,7 +124,7 @@ function resolveToken(raw: RawPrincipal, env: Record<string, string | undefined>
   return undefined;
 }
 
-/** Constant-time comparison that does not short-circuit on length or content. */
+/** Constant-time comparison that does not short-circuit on content. */
 function tokensEqual(a: string, b: string): boolean {
   const bufA = Buffer.from(a, "utf8");
   const bufB = Buffer.from(b, "utf8");
@@ -119,31 +134,63 @@ function tokensEqual(a: string, b: string): boolean {
   return timingSafeEqual(bufA, bufB);
 }
 
+function sha256Hex(value: string): string {
+  return createHash("sha256").update(value, "utf8").digest("hex");
+}
+
+/** Constant-time comparison of two hex strings. */
+function hexEqual(a: string, b: string): boolean {
+  const bufA = Buffer.from(a, "hex");
+  const bufB = Buffer.from(b, "hex");
+  if (bufA.length !== bufB.length || bufA.length === 0) {
+    return false;
+  }
+  return timingSafeEqual(bufA, bufB);
+}
+
+/** The SHA-256 hex that authenticates a principal — its tokenHash, or the hash of its token. */
+function credentialHash(principal: Principal): string {
+  if (principal.tokenHash) {
+    return principal.tokenHash;
+  }
+  return principal.token ? sha256Hex(principal.token) : "";
+}
+
 /**
- * Look up the principal whose token matches `token`. Every candidate is checked
- * with a constant-time comparison so a caller cannot learn which token prefix is
- * correct from response timing, and so token length is not leaked by an early
- * return. Returns undefined when nothing matches.
+ * Look up the principal a presented `token` authenticates. A principal matches
+ * when the token equals its plaintext `token` (constant-time) or when SHA-256 of
+ * the token equals its `tokenHash` (constant-time). Every candidate is checked
+ * (no early return) so response timing doesn't reveal which token is correct.
  */
 export function resolvePrincipal(principals: Principal[], token: string): Principal | undefined {
+  const presentedHash = sha256Hex(token);
   let match: Principal | undefined;
   for (const principal of principals) {
-    if (tokensEqual(principal.token, token)) {
+    if (principal.token !== undefined && tokensEqual(principal.token, token)) {
+      match = principal;
+    } else if (principal.tokenHash !== undefined && hexEqual(principal.tokenHash, presentedHash)) {
       match = principal;
     }
   }
   return match;
 }
 
-/** Guard against two principals sharing a token, which would make identity ambiguous. */
+/**
+ * Guard against two principals sharing a credential (which would make identity
+ * ambiguous). Compares the SHA-256 that each principal authenticates by, so a
+ * plaintext token and a matching tokenHash also collide.
+ */
 export function assertUniqueTokens(principals: Principal[]): void {
   const seen = new Set<string>();
   for (const principal of principals) {
-    if (seen.has(principal.token)) {
+    const key = credentialHash(principal);
+    if (key && seen.has(key)) {
       throw new Error(
-        `Duplicate principal token detected (principal "${principal.name}"). Each principal needs a distinct token.`
+        `Duplicate principal credential detected (principal "${principal.name}"). Each principal needs a distinct token.`
       );
     }
-    seen.add(principal.token);
+    if (key) {
+      seen.add(key);
+    }
   }
 }

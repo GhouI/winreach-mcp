@@ -291,7 +291,11 @@ export function loadConfig(): AppConfig {
   };
 }
 
-/** The shortest principal token length, used for weak-token warnings. */
+/**
+ * The shortest plaintext principal token length, used for weak-token warnings.
+ * Principals defined only by a `tokenHash` have no plaintext token here (their
+ * keys are store-generated and strong), so they don't lower the minimum.
+ */
 export function shortestTokenLength(principals: Principal[]): number {
-  return principals.reduce((min, principal) => Math.min(min, principal.token.length), Infinity);
+  return principals.reduce((min, principal) => Math.min(min, principal.token?.length ?? Infinity), Infinity);
 }
