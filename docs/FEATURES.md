@@ -136,14 +136,16 @@ resolution in [`src/principals.ts`](../src/principals.ts).
 - **Single admin token** — set `WINBRIDGE_TOKEN`. This becomes one implicit full-access principal named
   `default` with role `admin` and no per-principal command restrictions.
 - **Multiple principals** — set `WINBRIDGE_PRINCIPALS` to a JSON array. Each entry has a `name`, a `role`, a
-  token (inline `token` or, preferably, `tokenEnv` naming an environment variable), and optional per-principal
-  `allow`/`deny` regex lists:
+  token (inline `token` or, preferably, `tokenEnv` naming an environment variable), optional per-principal
+  `allow`/`deny` regex lists, and an optional `tools` allowlist that limits the principal to specific MCP tools
+  (omit `tools` for full access; a tool not in the list is never registered for that principal):
 
   ```json
   [
     { "name": "ci",    "role": "admin",    "tokenEnv": "CI_TOKEN" },
     { "name": "agent", "role": "readonly", "tokenEnv": "AGENT_TOKEN",
-      "allow": ["^Get-", "^Test-"], "deny": ["Remove-Item", "Stop-Service"] }
+      "allow": ["^Get-", "^Test-"], "deny": ["Remove-Item", "Stop-Service"],
+      "tools": ["powershell_execute"] }
   ]
   ```
 
