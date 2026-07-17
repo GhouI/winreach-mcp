@@ -208,6 +208,42 @@ export function Toggle({
   );
 }
 
+/* ----------------------------- Disclosure -------------------------------- */
+
+export function Disclosure({
+  summary,
+  hint,
+  defaultOpen,
+  children,
+}: {
+  summary: string;
+  hint?: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <details open={defaultOpen} className="group rounded-md border border-border bg-background/40">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-[13px] font-medium select-none [&::-webkit-details-marker]:hidden">
+        <span className="flex items-center gap-2">
+          <svg
+            aria-hidden
+            viewBox="0 0 12 12"
+            className="size-3 text-muted transition-transform group-open:rotate-90"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.6"
+          >
+            <path d="M4 2l4 4-4 4" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          {summary}
+        </span>
+        {hint && <span className="text-xs font-normal text-faint">{hint}</span>}
+      </summary>
+      <div className="space-y-6 border-t border-border px-4 py-5">{children}</div>
+    </details>
+  );
+}
+
 /* ------------------------------- Warning ---------------------------------- */
 
 export function Warn({ children }: { children: React.ReactNode }) {

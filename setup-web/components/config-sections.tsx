@@ -6,7 +6,7 @@
 
 import { generateToken, parseList } from "@/lib/winbridge-config";
 import type { FormState } from "@/lib/form-state";
-import { Field, Grid, Section, TextArea, TextInput, Toggle, Warn, btnSecondary } from "@/components/ui";
+import { Disclosure, Field, Grid, Section, TextArea, TextInput, Toggle, Warn, btnSecondary } from "@/components/ui";
 import { UsersEditor } from "@/components/users-editor";
 
 export type SetField = <K extends keyof FormState>(key: K, value: FormState[K]) => void;
@@ -36,6 +36,12 @@ export function formWarnings(form: FormState) {
 
 export function ServerSection({ form, set, eyebrow, frameless }: SectionProps) {
   const { exposedNoIps } = formWarnings(form);
+  const ipCount = parseList(form.allowedIps).length;
+  const originCount = parseList(form.allowedOrigins).length;
+  const advancedCount = ipCount + originCount;
+  // Open by default when there's something to show or a network-exposure nudge.
+  const advancedOpen = advancedCount > 0 || exposedNoIps;
+  const advancedHint = advancedCount > 0 ? `${advancedCount} set` : "optional";
   return (
     <Section
       eyebrow={eyebrow}
@@ -58,19 +64,24 @@ export function ServerSection({ form, set, eyebrow, frameless }: SectionProps) {
         </Field>
       </Grid>
 
-      <div className="border-t border-border pt-6">
+      <Disclosure summary="Advanced options" hint={advancedHint} defaultOpen={advancedOpen}>
+        <p className="max-w-prose text-xs leading-relaxed text-muted">
+          Network scoping. Both are optional and comma or newline separated — leave blank to
+          skip. Restricting these narrows who can reach the server and which browser origins
+          it will answer.
+        </p>
         <Grid>
           <Field
             label="Allowed source IPs / CIDRs"
-            hint="Corporate ranges, comma or newline separated. Used for the firewall rule."
+            hint="Corporate ranges. Used for the generated Windows firewall rule."
           >
             <TextArea value={form.allowedIps} onChange={(v) => set("allowedIps", v)} placeholder={"10.0.0.0/8\n203.0.113.5"} />
           </Field>
-          <Field label="Allowed origins" hint="Optional. Restricts the Origin header (browser clients).">
-            <TextInput value={form.allowedOrigins} onChange={(v) => set("allowedOrigins", v)} placeholder="https://app.example.com" mono />
+          <Field label="Allowed origins" hint="Restricts the Origin header (browser clients).">
+            <TextArea value={form.allowedOrigins} onChange={(v) => set("allowedOrigins", v)} placeholder={"https://app.example.com\nhttps://admin.example.com"} />
           </Field>
         </Grid>
-      </div>
+      </Disclosure>
 
       {exposedNoIps && (
         <Warn>
