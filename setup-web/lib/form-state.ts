@@ -9,6 +9,7 @@ import {
   parseList,
   type AuthMode,
   type WinBridgeConfig,
+  type WinBridgeRole,
   type WinBridgeUser,
 } from "@/lib/winbridge-config";
 
@@ -24,12 +25,23 @@ export type FormUser = {
   deny: string;
 };
 
+/** A role as edited in the wizard: allow/deny stay raw strings until generation. */
+export type FormRole = {
+  id: string;
+  name: string;
+  allTools: boolean;
+  tools: string[];
+  allow: string;
+  deny: string;
+};
+
 export type FormState = {
   host: string;
   port: string;
   endpointPath: string;
   authMode: AuthMode;
   token: string;
+  roles: FormRole[];
   users: FormUser[];
   allowedOrigins: string;
   screenshotEnabled: boolean;
@@ -62,12 +74,25 @@ export function newUser(name = ""): FormUser {
   };
 }
 
+/** A fresh role: all tools, no command restrictions — narrow it in the editor. */
+export function newRole(name = ""): FormRole {
+  return {
+    id: crypto.randomUUID(),
+    name,
+    allTools: true,
+    tools: [],
+    allow: "",
+    deny: "",
+  };
+}
+
 export const INITIAL: FormState = {
   host: DEFAULT_CONFIG.host,
   port: String(DEFAULT_CONFIG.port),
   endpointPath: DEFAULT_CONFIG.endpointPath,
   authMode: "single",
   token: "",
+  roles: [],
   users: [],
   allowedOrigins: "",
   screenshotEnabled: false,
@@ -96,6 +121,14 @@ export function toConfig(f: FormState): WinBridgeConfig {
     endpointPath: f.endpointPath.trim() || "/mcp",
     authMode: f.authMode,
     token: f.token.trim(),
+    roles: f.roles.map((r) => ({
+      id: r.id,
+      name: r.name.trim(),
+      allTools: r.allTools,
+      tools: r.tools,
+      allow: parseList(r.allow),
+      deny: parseList(r.deny),
+    })),
     users: f.users.map((u) => ({
       id: u.id,
       name: u.name.trim(),
@@ -136,6 +169,14 @@ export function fromConfig(cfg: WinBridgeConfig): FormState {
     endpointPath: cfg.endpointPath,
     authMode: cfg.authMode,
     token: cfg.token,
+    roles: (cfg.roles ?? []).map((r) => ({
+      id: r.id || crypto.randomUUID(),
+      name: r.name,
+      allTools: r.allTools,
+      tools: r.tools,
+      allow: r.allow.join("\n"),
+      deny: r.deny.join("\n"),
+    })),
     users: cfg.users.map((u) => ({
       id: u.id || crypto.randomUUID(),
       name: u.name,
@@ -181,6 +222,20 @@ export function sanitizeConfig(raw: unknown): WinBridgeConfig {
   const policy = obj(r.policy);
   const tls = obj(r.tls);
 
+  const roles: WinBridgeRole[] = Array.isArray(r.roles)
+    ? r.roles.map((rawRole) => {
+        const rr = obj(rawRole);
+        return {
+          id: str(rr.id, "") || crypto.randomUUID(),
+          name: str(rr.name, ""),
+          allTools: bool(rr.allTools, true),
+          tools: list(rr.tools),
+          allow: list(rr.allow),
+          deny: list(rr.deny),
+        };
+      })
+    : [];
+
   const users: WinBridgeUser[] = Array.isArray(r.users)
     ? r.users.map((rawUser) => {
         const u = obj(rawUser);
@@ -203,6 +258,7 @@ export function sanitizeConfig(raw: unknown): WinBridgeConfig {
     endpointPath: str(r.endpointPath, d.endpointPath).trim() || d.endpointPath,
     authMode: r.authMode === "users" ? "users" : "single",
     token: str(r.token, d.token),
+    roles,
     users,
     allowedOrigins: list(r.allowedOrigins),
     screenshot: {

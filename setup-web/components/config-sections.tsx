@@ -8,6 +8,7 @@ import { generateToken, parseList } from "@/lib/winbridge-config";
 import type { FormState } from "@/lib/form-state";
 import { Disclosure, Field, Grid, Section, TextArea, TextInput, Toggle, Warn, btnSecondary } from "@/components/ui";
 import { UsersEditor } from "@/components/users-editor";
+import { RolesEditor } from "@/components/roles-editor";
 
 export type SetField = <K extends keyof FormState>(key: K, value: FormState[K]) => void;
 
@@ -240,13 +241,26 @@ export function AccessSection({ form, set, eyebrow, frameless }: SectionProps) {
           </div>
         </Field>
       ) : (
-        <Field
-          label="Users"
-          hint="Each user becomes a WINBRIDGE_PRINCIPALS entry with its own key, role, and tool/command limits."
-          asDiv
-        >
-          <UsersEditor users={form.users} onChange={(users) => set("users", users)} />
-        </Field>
+        <>
+          <Field
+            label="Roles"
+            hint="Reusable permission sets (tools + command rules). Define them once; users inherit them."
+            asDiv
+          >
+            <RolesEditor roles={form.roles} onChange={(roles) => set("roles", roles)} />
+          </Field>
+          <Field
+            label="Users"
+            hint="Each user becomes a WINBRIDGE_PRINCIPALS entry with its own key. Pick a role to inherit its permissions."
+            asDiv
+          >
+            <UsersEditor
+              users={form.users}
+              roles={form.roles.map((r) => r.name.trim()).filter(Boolean)}
+              onChange={(users) => set("users", users)}
+            />
+          </Field>
+        </>
       )}
 
       <p className="border-t border-border pt-4 text-xs leading-relaxed text-muted">
