@@ -1,4 +1,5 @@
 import { request as httpsRequest } from "node:https";
+import { createHash } from "node:crypto";
 import { readFileSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -164,6 +165,49 @@ describeTls("in-app TLS and mutual TLS", () => {
     // Valid client cert but no bearer token: TLS + mTLS pass, auth rejects with 401.
     const result = await httpsPost(port, { ca: serverCa(), cert, key });
     expect(result.statusCode).toBe(401);
+  });
+
+  it("authenticates a tokenHash-defined principal by its bearer token and rejects a wrong one", async () => {
+    const secret = "hashed-principal-secret-token";
+    const tokenHash = createHash("sha256").update(secret, "utf8").digest("hex");
+    const [hashed] = parsePrincipals(
+      JSON.stringify([{ name: "hashed", role: "admin", tokenHash }]),
+      {}
+    );
+    const { app } = createWinBridgeApp(makeConfig({ principals: [hashed] }));
+    const { server } = createServerForApp(app, undefined);
+    const port = await listen(server);
+    const base = `http://127.0.0.1:${port}/mcp`;
+    const body = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping" });
+
+    // The correct token (whose SHA-256 is the stored hash) authenticates: the
+    // request passes auth and reaches the MCP handler (200, not 401).
+    const ok = await fetch(base, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        accept: "application/json, text/event-stream",
+        authorization: `Bearer ${secret}`
+      },
+      body
+    });
+    expect(ok.status).toBe(200);
+
+    // A wrong token is rejected at auth.
+    const wrong = await fetch(base, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: "Bearer wrong-token" },
+      body
+    });
+    expect(wrong.status).toBe(401);
+
+    // The stored hash string is not itself a valid bearer token.
+    const digestAsToken = await fetch(base, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${tokenHash}` },
+      body
+    });
+    expect(digestAsToken.status).toBe(401);
   });
 });
 
