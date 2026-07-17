@@ -29,7 +29,7 @@ async function runTargetCommand(
   argParts: string[]
 ): Promise<unknown> {
   const client = new Client({
-    name: "winbridge-diagnostic-client",
+    name: "winreach-diagnostic-client",
     version: "0.2.0"
   });
 
@@ -125,8 +125,8 @@ function usageText(): string {
     "  npm run client -- call-tool powershell_execute '{\"command\":\"Write-Output hello\"}'",
     "",
     "Targets:",
-    "  WINBRIDGE_URL=http://127.0.0.1:7573/mcp",
-    "  WINBRIDGE_URLS=http://win-1:7573/mcp,http://win-2:7573/mcp",
+    "  WINREACH_URL=http://127.0.0.1:7573/mcp",
+    "  WINREACH_URLS=http://win-1:7573/mcp,http://win-2:7573/mcp",
     "  npm run client -- --url http://win-1:7573/mcp --url http://win-2:7573/mcp exec hostname"
   ].join("\n");
 }

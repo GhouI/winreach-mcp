@@ -102,16 +102,9 @@ const DEFAULT_PORT = 7573;
 const DEFAULT_TIMEOUT_MS = 30000;
 const DEFAULT_MAX_OUTPUT_BYTES = 1024 * 1024;
 
-/**
- * Read an env var by its primary `WINBRIDGE_*` name, falling back to the legacy
- * `PENDRAGON_*` name for backward compatibility.
- */
+/** Read an env var by its `WINREACH_*` name. */
 function readEnv(name: string): string | undefined {
-  const primary = process.env[`WINBRIDGE_${name}`];
-  if (primary !== undefined) {
-    return primary;
-  }
-  return process.env[`PENDRAGON_${name}`];
+  return process.env[`WINREACH_${name}`];
 }
 
 function readNumberEnv(name: string, fallback: number): number {
@@ -122,7 +115,7 @@ function readNumberEnv(name: string, fallback: number): number {
 
   const parsed = Number(raw);
   if (!Number.isFinite(parsed) || parsed <= 0) {
-    throw new Error(`WINBRIDGE_${name} must be a positive number`);
+    throw new Error(`WINREACH_${name} must be a positive number`);
   }
 
   return parsed;
@@ -157,10 +150,10 @@ function readPatternListEnv(name: string): string[] {
       parsed = JSON.parse(raw);
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
-      throw new Error(`WINBRIDGE_${name} must be valid JSON: ${detail}`);
+      throw new Error(`WINREACH_${name} must be valid JSON: ${detail}`);
     }
     if (!Array.isArray(parsed) || parsed.some((item) => typeof item !== "string")) {
-      throw new Error(`WINBRIDGE_${name} JSON must be an array of strings`);
+      throw new Error(`WINREACH_${name} JSON must be an array of strings`);
     }
     return (parsed as string[]).map((value) => value.trim()).filter(Boolean);
   }
@@ -185,7 +178,7 @@ function loadTunnelConfig(): TunnelConfig {
   const enabled = raw !== undefined && raw !== "" && raw !== "off" && raw !== "false" && raw !== "none";
 
   if (enabled && raw !== "cloudflare" && raw !== "on" && raw !== "true" && raw !== "1") {
-    throw new Error(`Unsupported WINBRIDGE_TUNNEL value "${raw}". Use "cloudflare".`);
+    throw new Error(`Unsupported WINREACH_TUNNEL value "${raw}". Use "cloudflare".`);
   }
 
   return {
@@ -206,7 +199,7 @@ function readScreenshotRetentionHours(): number {
   }
   const parsed = Number(raw);
   if (!Number.isFinite(parsed) || parsed < 0) {
-    throw new Error("WINBRIDGE_SCREENSHOT_RETENTION_HOURS must be a non-negative number");
+    throw new Error("WINREACH_SCREENSHOT_RETENTION_HOURS must be a non-negative number");
   }
   return parsed;
 }
@@ -215,7 +208,7 @@ function loadScreenshotConfig(): ScreenshotConfig {
   return {
     enabled: readBoolEnv("ALLOW_SCREENSHOT", false),
     allowedRoles: readListEnv("SCREENSHOT_ROLES"),
-    dir: readEnv("SCREENSHOT_DIR")?.trim() || join(tmpdir(), "winbridge-screenshots"),
+    dir: readEnv("SCREENSHOT_DIR")?.trim() || join(tmpdir(), "winreach-screenshots"),
     retentionMs: readScreenshotRetentionHours() * 60 * 60 * 1000
   };
 }
@@ -226,7 +219,7 @@ function loadComputerUseConfig(): ComputerUseConfig {
     allowedRoles: readListEnv("COMPUTER_USE_ROLES"),
     keyDenylist: compilePatterns(
       readPatternListEnv("COMPUTER_USE_KEY_DENYLIST"),
-      "WINBRIDGE_COMPUTER_USE_KEY_DENYLIST"
+      "WINREACH_COMPUTER_USE_KEY_DENYLIST"
     ),
     maxActionsPerSec: readNumberEnv("COMPUTER_USE_MAX_ACTIONS_PER_SEC", 10),
     haltFile: readEnv("COMPUTER_USE_HALT_FILE")?.trim() || undefined,
@@ -248,8 +241,8 @@ function loadFileTransferConfig(): FileTransferConfig {
 
 function loadGlobalPolicy(): CommandPolicy {
   return {
-    allow: compilePatterns(readPatternListEnv("COMMAND_ALLOWLIST"), "WINBRIDGE_COMMAND_ALLOWLIST"),
-    deny: compilePatterns(readPatternListEnv("COMMAND_DENYLIST"), "WINBRIDGE_COMMAND_DENYLIST")
+    allow: compilePatterns(readPatternListEnv("COMMAND_ALLOWLIST"), "WINREACH_COMMAND_ALLOWLIST"),
+    deny: compilePatterns(readPatternListEnv("COMMAND_DENYLIST"), "WINREACH_COMMAND_DENYLIST")
   };
 }
 
@@ -261,13 +254,13 @@ function loadTlsConfig(): TlsConfig | undefined {
 
   if (!certPath && !keyPath) {
     if (clientCaPath) {
-      throw new Error("WINBRIDGE_TLS_CLIENT_CA requires WINBRIDGE_TLS_CERT and WINBRIDGE_TLS_KEY (mTLS needs TLS).");
+      throw new Error("WINREACH_TLS_CLIENT_CA requires WINREACH_TLS_CERT and WINREACH_TLS_KEY (mTLS needs TLS).");
     }
     return undefined;
   }
 
   if (!certPath || !keyPath) {
-    throw new Error("Both WINBRIDGE_TLS_CERT and WINBRIDGE_TLS_KEY must be set to enable TLS.");
+    throw new Error("Both WINREACH_TLS_CERT and WINREACH_TLS_KEY must be set to enable TLS.");
   }
 
   return {
@@ -280,7 +273,7 @@ function loadTlsConfig(): TlsConfig | undefined {
 
 /**
  * Build the principal list from the legacy single token and/or the
- * WINBRIDGE_PRINCIPALS array. At least one principal is required.
+ * WINREACH_PRINCIPALS array. At least one principal is required.
  */
 function loadPrincipals(): Principal[] {
   const principals: Principal[] = [];
@@ -300,7 +293,7 @@ function loadPrincipals(): Principal[] {
   }
 
   if (principals.length === 0) {
-    throw new Error("WINBRIDGE_TOKEN or WINBRIDGE_PRINCIPALS is required");
+    throw new Error("WINREACH_TOKEN or WINREACH_PRINCIPALS is required");
   }
 
   assertUniqueTokens(principals);
@@ -311,7 +304,7 @@ export function loadConfig(): AppConfig {
   const globalPolicy = loadGlobalPolicy();
 
   return {
-    name: "winbridge-mcp",
+    name: "winreach-mcp",
     version: "0.2.0",
     host: readEnv("HOST") ?? "127.0.0.1",
     port: readNumberEnv("PORT", DEFAULT_PORT),

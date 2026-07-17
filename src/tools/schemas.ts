@@ -40,7 +40,7 @@ export const fileUploadInputSchema = {
   path: z
     .string()
     .min(1)
-    .describe("Destination path, relative to the configured file root (WINBRIDGE_FILE_ROOT)."),
+    .describe("Destination path, relative to the configured file root (WINREACH_FILE_ROOT)."),
   content: z.string().describe("File content, base64-encoded."),
   overwrite: z.boolean().optional().describe("Overwrite an existing file. Defaults to false.")
 };
@@ -49,7 +49,7 @@ export const fileDownloadInputSchema = {
   path: z
     .string()
     .min(1)
-    .describe("Source path, relative to the configured file root (WINBRIDGE_FILE_ROOT)."),
+    .describe("Source path, relative to the configured file root (WINREACH_FILE_ROOT)."),
   deleteSource: z
     .boolean()
     .optional()

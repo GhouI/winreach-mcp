@@ -4,7 +4,7 @@
 // stage) and the dashboard's Configuration view (stacked). All state lives in
 // the page and flows in via `form` / `set`.
 
-import { generateToken, parseList } from "@/lib/winbridge-config";
+import { generateToken, parseList } from "@/lib/winreach-config";
 import type { FormState } from "@/lib/form-state";
 import { Disclosure, Field, Grid, Section, TextArea, TextInput, Toggle, Warn, btnSecondary } from "@/components/ui";
 import { UsersEditor } from "@/components/users-editor";
@@ -48,7 +48,7 @@ export function ServerSection({ form, set, eyebrow, frameless }: SectionProps) {
       eyebrow={eyebrow}
       frameless={frameless}
       title="Server"
-      desc="Where WinBridge binds, its endpoint, and which networks may reach it."
+      desc="Where WinReach binds, its endpoint, and which networks may reach it."
     >
       <Grid>
         <Field label="Bind host" hint="127.0.0.1 unless behind a firewall or tunnel.">
@@ -161,7 +161,7 @@ export function ToolsSection({ form, set, eyebrow, frameless }: SectionProps) {
         {form.fileEnabled && (
           <div className="mt-4 grid grid-cols-1 gap-x-5 gap-y-5 border-t border-border pt-4 sm:grid-cols-2">
             <Field label="File root (sandbox)" hint="Required. All transfers stay inside this dir.">
-              <TextInput value={form.fileRoot} onChange={(v) => set("fileRoot", v)} placeholder="C:\winbridge-files" mono />
+              <TextInput value={form.fileRoot} onChange={(v) => set("fileRoot", v)} placeholder="C:\winreach-files" mono />
             </Field>
             <Field label="Max file size (MB)">
               <TextInput value={form.maxBytesMB} onChange={(v) => set("maxBytesMB", v)} inputMode="numeric" placeholder="75" mono />
@@ -216,7 +216,7 @@ export function AccessSection({ form, set, eyebrow, frameless }: SectionProps) {
             active={form.authMode === "single"}
             onClick={() => set("authMode", "single")}
             title="Single admin token"
-            desc="One shared WINBRIDGE_TOKEN"
+            desc="One shared WINREACH_TOKEN"
           />
           <ModeButton
             active={form.authMode === "users"}
@@ -228,7 +228,7 @@ export function AccessSection({ form, set, eyebrow, frameless }: SectionProps) {
       </Field>
 
       {form.authMode === "single" ? (
-        <Field label="Bearer token (WINBRIDGE_TOKEN)" hint="Required. Use a long random value.">
+        <Field label="Bearer token (WINREACH_TOKEN)" hint="Required. Use a long random value.">
           <div className="flex gap-2">
             <TextInput value={form.token} onChange={(v) => set("token", v)} placeholder="click Generate" mono />
             <button
@@ -251,7 +251,7 @@ export function AccessSection({ form, set, eyebrow, frameless }: SectionProps) {
           </Field>
           <Field
             label="Users"
-            hint="Each user becomes a WINBRIDGE_PRINCIPALS entry with its own key. Pick a role to inherit its permissions."
+            hint="Each user becomes a WINREACH_PRINCIPALS entry with its own key. Pick a role to inherit its permissions."
             asDiv
           >
             <UsersEditor

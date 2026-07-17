@@ -14,7 +14,7 @@
 // prompts, not blank space.
 
 import { useState } from "react";
-import { connectUrl, type WinBridgeConfig } from "@/lib/winbridge-config";
+import { connectUrl, type WinReachConfig } from "@/lib/winreach-config";
 import type { FormState } from "@/lib/form-state";
 import { OutputPanel } from "@/components/output-panel";
 import { ConsoleTerminal } from "@/components/console-terminal";
@@ -78,7 +78,7 @@ export function Dashboard({
   form: FormState;
   set: SetField;
   setForm: (f: FormState) => void;
-  cfg: WinBridgeConfig;
+  cfg: WinReachConfig;
   tabs: Record<string, string>;
   features: string[];
   boot: Boot | null;
@@ -147,7 +147,7 @@ export function Dashboard({
         {/* Masthead */}
         <div className="mb-7 border-b border-border pb-5">
           <p className="eyebrow mb-2">{VIEW_TITLES[view]}</p>
-          <h1 className="text-[22px] font-semibold leading-tight tracking-tight">WinBridge server</h1>
+          <h1 className="text-[22px] font-semibold leading-tight tracking-tight">WinReach server</h1>
           <p className="mt-2 break-all font-mono text-[12px] leading-relaxed text-muted">
             {connectUrl(cfg)}
             <span className="mx-2 text-faint" aria-hidden>·</span>

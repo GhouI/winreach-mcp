@@ -5,7 +5,7 @@
 //        test  = connect + report StoreStatus (no persistence)
 //        setup = init (create/validate schema) + persist the encrypted config
 //
-// Auth: Authorization: Bearer <WINBRIDGE_SETUP_KEY> (or x-setup-key header).
+// Auth: Authorization: Bearer <WINREACH_SETUP_KEY> (or x-setup-key header).
 
 import { NextResponse, type NextRequest } from "next/server";
 import { authorizeSetupKey } from "@/lib/setup-key";
@@ -35,7 +35,7 @@ function parseConfig(raw: unknown): ParseResult {
     return { error: `config.kind must be one of: ${KINDS.join(", ")}.` };
   }
   if (kind === "sqlite") {
-    const file = typeof r.file === "string" && r.file.trim() ? r.file.trim() : "data/winbridge.sqlite";
+    const file = typeof r.file === "string" && r.file.trim() ? r.file.trim() : "data/winreach.sqlite";
     return { config: { kind: "sqlite", file } };
   }
   const url = typeof r.url === "string" ? r.url.trim() : "";
@@ -97,7 +97,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         error:
-          "WINBRIDGE_DB_KEY is not set. It is required to encrypt the connection string at rest for non-SQLite backends. Set it on the host and retry.",
+          "WINREACH_DB_KEY is not set. It is required to encrypt the connection string at rest for non-SQLite backends. Set it on the host and retry.",
       },
       { status: 400 },
     );

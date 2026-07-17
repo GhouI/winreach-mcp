@@ -12,7 +12,7 @@ export type AdminAccount = {
   createdAt: string; // ISO
 };
 
-/** A principal / agent key (becomes one WINBRIDGE_PRINCIPALS entry). */
+/** A principal / agent key (becomes one WINREACH_PRINCIPALS entry). */
 export type AccountUser = {
   id: string;
   name: string;
@@ -115,5 +115,5 @@ export const REQUIRED_USER_FIELDS = [
 
 export const REQUIRED_ADMIN_FIELDS = ["id", "username", "password_hash", "created_at"] as const;
 
-/** Bump when the required schema changes; stored in winbridge_meta. */
+/** Bump when the required schema changes; stored in winreach_meta. */
 export const SCHEMA_VERSION = 1;

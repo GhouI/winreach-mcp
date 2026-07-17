@@ -24,7 +24,7 @@ export type Principal = {
   tools?: string[];
 };
 
-/** The shape accepted in the WINBRIDGE_PRINCIPALS JSON array. */
+/** The shape accepted in the WINREACH_PRINCIPALS JSON array. */
 type RawPrincipal = {
   name?: unknown;
   role?: unknown;
@@ -51,7 +51,7 @@ function asStringArray(value: unknown, path: string): string[] {
 }
 
 /**
- * Build the single implicit principal from the legacy WINBRIDGE_TOKEN. It is a
+ * Build the single implicit principal from the legacy WINREACH_TOKEN. It is a
  * full-access "admin" identity so existing single-token deployments keep working
  * unchanged.
  */
@@ -60,7 +60,7 @@ export function createPrimaryPrincipal(token: string, policy: CommandPolicy): Pr
 }
 
 /**
- * Parse WINBRIDGE_PRINCIPALS (a JSON array) into Principal objects. Each entry
+ * Parse WINREACH_PRINCIPALS (a JSON array) into Principal objects. Each entry
  * supplies its token inline (`token`) or by naming an env var (`tokenEnv`), plus
  * optional `allow`/`deny` regex lists for a per-principal command policy.
  *
@@ -80,15 +80,15 @@ export function parsePrincipals(
     parsed = JSON.parse(raw);
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
-    throw new Error(`WINBRIDGE_PRINCIPALS must be valid JSON: ${detail}`);
+    throw new Error(`WINREACH_PRINCIPALS must be valid JSON: ${detail}`);
   }
 
   if (!Array.isArray(parsed) || parsed.length === 0) {
-    throw new Error("WINBRIDGE_PRINCIPALS must be a non-empty JSON array");
+    throw new Error("WINREACH_PRINCIPALS must be a non-empty JSON array");
   }
 
   return parsed.map((entry, index) => {
-    const path = `WINBRIDGE_PRINCIPALS[${index}]`;
+    const path = `WINREACH_PRINCIPALS[${index}]`;
     if (!isRecord(entry)) {
       throw new Error(`${path} must be an object`);
     }

@@ -50,7 +50,7 @@ export function AuthGate({ signup, onDone }: { signup: boolean; onDone: () => vo
         desc={
           signup
             ? "No admin exists yet. Creating it requires the setup key so only the operator can claim the first admin."
-            : "Sign in to manage WinBridge account keys."
+            : "Sign in to manage WinReach account keys."
         }
       >
         <form
@@ -61,7 +61,7 @@ export function AuthGate({ signup, onDone }: { signup: boolean; onDone: () => vo
           className="space-y-5"
         >
           {signup && (
-            <Field label="Setup key" hint="Must match WINBRIDGE_SETUP_KEY on this host.">
+            <Field label="Setup key" hint="Must match WINREACH_SETUP_KEY on this host.">
               <TextInput value={setupKey} onChange={setSetupKey} placeholder="paste your setup key" mono />
             </Field>
           )}

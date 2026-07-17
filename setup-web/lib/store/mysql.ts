@@ -106,8 +106,8 @@ export class MysqlStore implements AccountStore {
     let created = false;
     const missing: string[] = [];
 
-    if (!(await this.tableExists("winbridge_admins"))) {
-      await c.query(`CREATE TABLE IF NOT EXISTS winbridge_admins (
+    if (!(await this.tableExists("winreach_admins"))) {
+      await c.query(`CREATE TABLE IF NOT EXISTS winreach_admins (
         id VARCHAR(255) PRIMARY KEY,
         username VARCHAR(255) UNIQUE NOT NULL,
         password_hash VARCHAR(255) NOT NULL,
@@ -115,11 +115,11 @@ export class MysqlStore implements AccountStore {
       )`);
       created = true;
     } else {
-      missing.push(...missingFields(await this.columns("winbridge_admins"), REQUIRED_ADMIN_FIELDS));
+      missing.push(...missingFields(await this.columns("winreach_admins"), REQUIRED_ADMIN_FIELDS));
     }
 
-    if (!(await this.tableExists("winbridge_users"))) {
-      await c.query(`CREATE TABLE IF NOT EXISTS winbridge_users (
+    if (!(await this.tableExists("winreach_users"))) {
+      await c.query(`CREATE TABLE IF NOT EXISTS winreach_users (
         id VARCHAR(255) PRIMARY KEY,
         name VARCHAR(255) UNIQUE NOT NULL,
         role VARCHAR(255) NOT NULL,
@@ -134,15 +134,15 @@ export class MysqlStore implements AccountStore {
       )`);
       created = true;
     } else {
-      missing.push(...missingFields(await this.columns("winbridge_users"), REQUIRED_USER_FIELDS));
+      missing.push(...missingFields(await this.columns("winreach_users"), REQUIRED_USER_FIELDS));
     }
 
-    await c.query(`CREATE TABLE IF NOT EXISTS winbridge_meta (
+    await c.query(`CREATE TABLE IF NOT EXISTS winreach_meta (
       \`key\` VARCHAR(255) PRIMARY KEY,
       value TEXT NOT NULL
     )`);
     await c.query(
-      "INSERT INTO winbridge_meta (`key`, value) VALUES ('schema_version', ?) " +
+      "INSERT INTO winreach_meta (`key`, value) VALUES ('schema_version', ?) " +
         "ON DUPLICATE KEY UPDATE value = VALUES(value)",
       [String(SCHEMA_VERSION)],
     );
@@ -162,7 +162,7 @@ export class MysqlStore implements AccountStore {
 
   private async readVersion(): Promise<number | undefined> {
     try {
-      const rows = await this.rows("SELECT value FROM winbridge_meta WHERE `key` = 'schema_version'");
+      const rows = await this.rows("SELECT value FROM winreach_meta WHERE `key` = 'schema_version'");
       return rows[0] ? Number(rows[0].value) : undefined;
     } catch {
       return undefined;
@@ -172,12 +172,12 @@ export class MysqlStore implements AccountStore {
   async status(): Promise<StoreStatus> {
     await this.connect();
     const missing: string[] = [];
-    const adminsExist = await this.tableExists("winbridge_admins");
-    const usersExist = await this.tableExists("winbridge_users");
-    if (!adminsExist) missing.push("winbridge_admins");
-    else missing.push(...missingFields(await this.columns("winbridge_admins"), REQUIRED_ADMIN_FIELDS));
-    if (!usersExist) missing.push("winbridge_users");
-    else missing.push(...missingFields(await this.columns("winbridge_users"), REQUIRED_USER_FIELDS));
+    const adminsExist = await this.tableExists("winreach_admins");
+    const usersExist = await this.tableExists("winreach_users");
+    if (!adminsExist) missing.push("winreach_admins");
+    else missing.push(...missingFields(await this.columns("winreach_admins"), REQUIRED_ADMIN_FIELDS));
+    if (!usersExist) missing.push("winreach_users");
+    else missing.push(...missingFields(await this.columns("winreach_users"), REQUIRED_USER_FIELDS));
     const schemaReady = adminsExist && usersExist && missing.length === 0;
     return {
       connected: true,
@@ -197,7 +197,7 @@ export class MysqlStore implements AccountStore {
   }
 
   async countAdmins(): Promise<number> {
-    const rows = await this.rows("SELECT COUNT(*) AS n FROM winbridge_admins");
+    const rows = await this.rows("SELECT COUNT(*) AS n FROM winreach_admins");
     return Number(rows[0].n);
   }
 
@@ -205,34 +205,34 @@ export class MysqlStore implements AccountStore {
     const c = await this.connect();
     const admin: AdminAccount = { id: newId(), username, passwordHash, createdAt: nowIso() };
     await c.execute(
-      "INSERT INTO winbridge_admins (id, username, password_hash, created_at) VALUES (?, ?, ?, ?)",
+      "INSERT INTO winreach_admins (id, username, password_hash, created_at) VALUES (?, ?, ?, ?)",
       [admin.id, admin.username, admin.passwordHash, toDbTime(admin.createdAt)],
     );
     return admin;
   }
 
   async getAdminByUsername(username: string): Promise<AdminAccount | null> {
-    const rows = await this.rows("SELECT * FROM winbridge_admins WHERE username = ?", [username]);
+    const rows = await this.rows("SELECT * FROM winreach_admins WHERE username = ?", [username]);
     return rows[0] ? mapAdmin(rows[0]) : null;
   }
 
   async getAdminById(id: string): Promise<AdminAccount | null> {
-    const rows = await this.rows("SELECT * FROM winbridge_admins WHERE id = ?", [id]);
+    const rows = await this.rows("SELECT * FROM winreach_admins WHERE id = ?", [id]);
     return rows[0] ? mapAdmin(rows[0]) : null;
   }
 
   async listUsers(): Promise<AccountUser[]> {
-    const rows = await this.rows("SELECT * FROM winbridge_users ORDER BY created_at ASC");
+    const rows = await this.rows("SELECT * FROM winreach_users ORDER BY created_at ASC");
     return rows.map(mapUser);
   }
 
   async getUserById(id: string): Promise<AccountUser | null> {
-    const rows = await this.rows("SELECT * FROM winbridge_users WHERE id = ?", [id]);
+    const rows = await this.rows("SELECT * FROM winreach_users WHERE id = ?", [id]);
     return rows[0] ? mapUser(rows[0]) : null;
   }
 
   async getUserByTokenHash(tokenHash: string): Promise<AccountUser | null> {
-    const rows = await this.rows("SELECT * FROM winbridge_users WHERE token_hash = ?", [tokenHash]);
+    const rows = await this.rows("SELECT * FROM winreach_users WHERE token_hash = ?", [tokenHash]);
     return rows[0] ? mapUser(rows[0]) : null;
   }
 
@@ -252,7 +252,7 @@ export class MysqlStore implements AccountStore {
       lastUsedAt: null,
     };
     await c.execute(
-      `INSERT INTO winbridge_users
+      `INSERT INTO winreach_users
         (id, name, role, token_hash, token_enc, tools, allow, deny, enabled, created_at, last_used_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
@@ -287,21 +287,21 @@ export class MysqlStore implements AccountStore {
     }
     if (sets.length > 0) {
       values.push(id);
-      await c.execute(`UPDATE winbridge_users SET ${sets.join(", ")} WHERE id = ?`, values);
+      await c.execute(`UPDATE winreach_users SET ${sets.join(", ")} WHERE id = ?`, values);
     }
     return this.getUserById(id);
   }
 
   async deleteUser(id: string): Promise<boolean> {
     const c = await this.connect();
-    const [res] = await c.execute("DELETE FROM winbridge_users WHERE id = ?", [id]);
+    const [res] = await c.execute("DELETE FROM winreach_users WHERE id = ?", [id]);
     const affected = (res as { affectedRows?: number }).affectedRows ?? 0;
     return affected > 0;
   }
 
   async touchUser(id: string, whenIso: string): Promise<void> {
     const c = await this.connect();
-    await c.execute("UPDATE winbridge_users SET last_used_at = ? WHERE id = ?", [
+    await c.execute("UPDATE winreach_users SET last_used_at = ? WHERE id = ?", [
       toDbTime(whenIso),
       id,
     ]);

@@ -1,19 +1,19 @@
-// Server-only persistence for the saved WinBridge setup config.
+// Server-only persistence for the saved WinReach setup config.
 // Stored as JSON next to the app (this app runs on the Windows host itself),
 // so agents with the setup key and the local operator see the same document.
 
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import type { WinBridgeConfig } from "@/lib/winbridge-config";
+import type { WinReachConfig } from "@/lib/winreach-config";
 
 export type StoredConfig = {
-  config: WinBridgeConfig;
+  config: WinReachConfig;
   updatedAt: string; // ISO timestamp
   updatedBy: "web" | "agent";
 };
 
 function storePath(): string {
-  return path.join(process.cwd(), "data", "winbridge-setup.config.json");
+  return path.join(process.cwd(), "data", "winreach-setup.config.json");
 }
 
 export async function readStoredConfig(): Promise<StoredConfig | null> {
@@ -26,7 +26,7 @@ export async function readStoredConfig(): Promise<StoredConfig | null> {
 }
 
 export async function writeStoredConfig(
-  config: WinBridgeConfig,
+  config: WinReachConfig,
   updatedBy: StoredConfig["updatedBy"],
 ): Promise<StoredConfig> {
   const doc: StoredConfig = {

@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "WinBridge MCP",
+  title: "WinReach MCP",
   description:
-    "Configure and operate a WinBridge MCP server: enable tools, restrict access by IP, manage account keys, and generate env vars, firewall rules, and agent-connect snippets.",
+    "Configure and operate a WinReach MCP server: enable tools, restrict access by IP, manage account keys, and generate env vars, firewall rules, and agent-connect snippets.",
 };
 
 export const viewport: Viewport = {

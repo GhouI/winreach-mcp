@@ -6,7 +6,7 @@ import { compilePatterns, type CommandPolicy } from "./policy.js";
  * allowlist. Any of those fields set on the principal itself override the role's
  * value for that field, so a role provides defaults a principal can specialize.
  *
- * Roles are defined in WINBRIDGE_ROLES, a JSON object keyed by role name:
+ * Roles are defined in WINREACH_ROLES, a JSON object keyed by role name:
  *
  *   {
  *     "deployer": { "tools": ["powershell_execute", "file_upload"],
@@ -45,7 +45,7 @@ function asStringArray(value: unknown, path: string): string[] {
 }
 
 /**
- * Parse WINBRIDGE_ROLES (a JSON object mapping role name to a permission set)
+ * Parse WINREACH_ROLES (a JSON object mapping role name to a permission set)
  * into compiled role definitions. Every field of a role is optional; an omitted
  * `tools` grants every tool, and omitted `allow`/`deny` mean no policy for that
  * dimension.
@@ -56,20 +56,20 @@ export function parseRoles(raw: string): Map<string, RoleDefinition> {
     parsed = JSON.parse(raw);
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
-    throw new Error(`WINBRIDGE_ROLES must be valid JSON: ${detail}`);
+    throw new Error(`WINREACH_ROLES must be valid JSON: ${detail}`);
   }
 
   if (!isRecord(parsed)) {
-    throw new Error("WINBRIDGE_ROLES must be a JSON object mapping a role name to a permission set");
+    throw new Error("WINREACH_ROLES must be a JSON object mapping a role name to a permission set");
   }
 
   const roles = new Map<string, RoleDefinition>();
   for (const [rawName, value] of Object.entries(parsed)) {
     const name = rawName.trim();
     if (!name) {
-      throw new Error("WINBRIDGE_ROLES contains an empty role name");
+      throw new Error("WINREACH_ROLES contains an empty role name");
     }
-    const path = `WINBRIDGE_ROLES.${name}`;
+    const path = `WINREACH_ROLES.${name}`;
     if (!isRecord(value)) {
       throw new Error(`${path} must be an object`);
     }

@@ -37,7 +37,7 @@ describeTls("buildTlsOptions", () => {
   it("throws a helpful error when a file is missing", () => {
     expect(() =>
       buildTlsOptions({ certPath: join(process.cwd(), "does-not-exist.pem"), keyPath: serverTls.keyPath })
-    ).toThrow(/WINBRIDGE_TLS_CERT/);
+    ).toThrow(/WINREACH_TLS_CERT/);
   });
 });
 

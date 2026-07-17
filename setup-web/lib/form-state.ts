@@ -1,5 +1,5 @@
 // Bridges the wizard's raw form state (all strings, as typed) and the
-// structured WinBridgeConfig used by the generators and the agent API.
+// structured WinReachConfig used by the generators and the agent API.
 // Pure functions only — no React/DOM.
 
 import {
@@ -8,10 +8,10 @@ import {
   generateToken,
   parseList,
   type AuthMode,
-  type WinBridgeConfig,
-  type WinBridgeRole,
-  type WinBridgeUser,
-} from "@/lib/winbridge-config";
+  type WinReachConfig,
+  type WinReachRole,
+  type WinReachUser,
+} from "@/lib/winreach-config";
 
 /** A user as edited in the wizard: allow/deny stay raw strings until generation. */
 export type FormUser = {
@@ -110,7 +110,7 @@ export const INITIAL: FormState = {
   tunnel: false,
 };
 
-export function toConfig(f: FormState): WinBridgeConfig {
+export function toConfig(f: FormState): WinReachConfig {
   const num = (v: string, fallback: number) => {
     const n = Number(v);
     return Number.isFinite(n) && n > 0 ? n : fallback;
@@ -161,8 +161,8 @@ export function toConfig(f: FormState): WinBridgeConfig {
   };
 }
 
-/** Inverse of toConfig — hydrates the wizard from a saved WinBridgeConfig. */
-export function fromConfig(cfg: WinBridgeConfig): FormState {
+/** Inverse of toConfig — hydrates the wizard from a saved WinReachConfig. */
+export function fromConfig(cfg: WinReachConfig): FormState {
   return {
     host: cfg.host,
     port: String(cfg.port),
@@ -205,7 +205,7 @@ export function fromConfig(cfg: WinBridgeConfig): FormState {
 }
 
 /** Deep-merge unknown JSON onto DEFAULT_CONFIG, keeping only known fields. */
-export function sanitizeConfig(raw: unknown): WinBridgeConfig {
+export function sanitizeConfig(raw: unknown): WinReachConfig {
   const r = (raw ?? {}) as Record<string, unknown>;
   const obj = (v: unknown): Record<string, unknown> =>
     v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
@@ -222,7 +222,7 @@ export function sanitizeConfig(raw: unknown): WinBridgeConfig {
   const policy = obj(r.policy);
   const tls = obj(r.tls);
 
-  const roles: WinBridgeRole[] = Array.isArray(r.roles)
+  const roles: WinReachRole[] = Array.isArray(r.roles)
     ? r.roles.map((rawRole) => {
         const rr = obj(rawRole);
         return {
@@ -236,7 +236,7 @@ export function sanitizeConfig(raw: unknown): WinBridgeConfig {
       })
     : [];
 
-  const users: WinBridgeUser[] = Array.isArray(r.users)
+  const users: WinReachUser[] = Array.isArray(r.users)
     ? r.users.map((rawUser) => {
         const u = obj(rawUser);
         return {

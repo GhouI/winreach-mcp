@@ -18,7 +18,7 @@ const start4 = start3 + D3 - OVERLAP;
 
 export const TOTAL_FRAMES = start4 + D4;
 
-export function WinBridgeDemo() {
+export function WinReachDemo() {
   return (
     <AbsoluteFill style={sceneBg}>
       <SceneSeq from={0} durationInFrames={D1}>

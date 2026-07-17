@@ -96,10 +96,10 @@ describe("PowerShell sessions", () => {
 
     try {
       await manager.send(session.sessionId, {
-        command: "$winbridgeValue = \"persisted\""
+        command: "$winreachValue = \"persisted\""
       });
       const result = await manager.send(session.sessionId, {
-        command: "Write-Output $winbridgeValue"
+        command: "Write-Output $winreachValue"
       });
 
       expect(result.stdout).toContain("persisted");

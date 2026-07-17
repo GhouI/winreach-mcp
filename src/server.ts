@@ -1,7 +1,7 @@
 import { pathToFileURL } from "node:url";
 import type { AppConfig } from "./config.js";
 import { loadConfig, shortestTokenLength } from "./config.js";
-import { createWinBridgeApp } from "./mcpServer.js";
+import { createWinReachApp } from "./mcpServer.js";
 import { sweepOldScreenshots } from "./powershell/screenshot.js";
 import { createServerForApp } from "./tls.js";
 import { startCloudflareTunnel, type TunnelHandle } from "./tunnel.js";
@@ -11,12 +11,12 @@ function printConnectionHelp(mcpUrl: string): void {
   console.log("Connect an agent with this public endpoint (the bearer token is still required):");
   console.log("");
   console.log("Claude Code:");
-  console.log(`  claude mcp add --transport http winbridge ${mcpUrl} --header "Authorization: Bearer <WINBRIDGE_TOKEN>"`);
+  console.log(`  claude mcp add --transport http winreach ${mcpUrl} --header "Authorization: Bearer <WINREACH_TOKEN>"`);
   console.log("");
   console.log("Codex (~/.codex/config.toml):");
-  console.log("  [mcp_servers.winbridge]");
+  console.log("  [mcp_servers.winreach]");
   console.log(`  url = "${mcpUrl}"`);
-  console.log('  bearer_token_env_var = "WINBRIDGE_TOKEN"');
+  console.log('  bearer_token_env_var = "WINREACH_TOKEN"');
   console.log("  enabled = true");
   console.log("");
 }
@@ -24,7 +24,7 @@ function printConnectionHelp(mcpUrl: string): void {
 export async function main(): Promise<void> {
   const config = loadConfig();
   const tunnelRequested = config.tunnel.enabled || process.argv.includes("--tunnel");
-  const { app, sessions } = createWinBridgeApp(config);
+  const { app, sessions } = createWinReachApp(config);
 
   if (config.screenshot.enabled) {
     // Prune any captures left over from a previous run before serving requests.
@@ -36,7 +36,7 @@ export async function main(): Promise<void> {
 
   const { server: httpServer, scheme } = createServerForApp(app, config.tls);
   httpServer.listen(config.port, config.host, () => {
-    console.log(`WinBridge MCP listening at ${scheme}://${config.host}:${config.port}${config.endpointPath}`);
+    console.log(`WinReach MCP listening at ${scheme}://${config.host}:${config.port}${config.endpointPath}`);
     if (config.tls?.clientCaPath) {
       console.log("Mutual TLS is enabled: clients must present a certificate trusted by the configured CA.");
     }
@@ -46,13 +46,13 @@ export async function main(): Promise<void> {
   if (tunnelRequested) {
     if (config.tls) {
       console.warn(
-        "Warning: tunnel mode terminates TLS at Cloudflare and forwards to WinBridge over loopback. " +
+        "Warning: tunnel mode terminates TLS at Cloudflare and forwards to WinReach over loopback. " +
           "In-app TLS/mTLS is not applied to tunnel traffic; rely on the bearer token over the tunnel."
       );
     }
     if (shortestTokenLength(config.principals) < 24) {
       console.warn(
-        "Warning: a WinBridge token is short. Tunnel mode exposes this remote-command server to the public " +
+        "Warning: a WinReach token is short. Tunnel mode exposes this remote-command server to the public " +
           "internet (protected only by the bearer token). Use a long random token, e.g. 32+ characters."
       );
     }
@@ -63,7 +63,7 @@ export async function main(): Promise<void> {
       printConnectionHelp(tunnel.mcpUrl);
     } catch (error) {
       console.error("Failed to start the Cloudflare tunnel:", error instanceof Error ? error.message : error);
-      console.error("WinBridge is still reachable on the local endpoint above.");
+      console.error("WinReach is still reachable on the local endpoint above.");
     }
   }
 
@@ -85,7 +85,7 @@ export async function main(): Promise<void> {
 }
 
 function startTunnel(config: AppConfig): Promise<TunnelHandle> {
-  // cloudflared connects to WinBridge over loopback, so the public tunnel needs
+  // cloudflared connects to WinReach over loopback, so the public tunnel needs
   // no inbound firewall rule and no 0.0.0.0 bind.
   return startCloudflareTunnel({
     localUrl: `http://127.0.0.1:${config.port}`,

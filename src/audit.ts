@@ -32,7 +32,7 @@ export type AuditEntry = {
   textLength?: number;
   /** computer_use: SHA-256 (truncated) of typed text, so a value is auditable without storing it. */
   textHash?: string;
-  /** computer_use: the raw typed text, only when WINBRIDGE_COMPUTER_USE_AUDIT_TEXT is set. */
+  /** computer_use: the raw typed text, only when WINREACH_COMPUTER_USE_AUDIT_TEXT is set. */
   text?: string;
 };
 
@@ -75,7 +75,7 @@ class FileAuditLogger implements AuditLogger {
       if (!this.warned) {
         this.warned = true;
         const detail = error instanceof Error ? error.message : String(error);
-        console.error(`WinBridge audit logging to ${this.filePath} failed: ${detail}`);
+        console.error(`WinReach audit logging to ${this.filePath} failed: ${detail}`);
       }
     }
   }

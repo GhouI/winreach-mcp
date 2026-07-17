@@ -24,7 +24,7 @@ afterEach(() => {
 });
 
 function makeTempDir(): string {
-  const dir = mkdtempSync(join(tmpdir(), "winbridge-shot-test-"));
+  const dir = mkdtempSync(join(tmpdir(), "winreach-shot-test-"));
   tempDirs.push(dir);
   return dir;
 }
@@ -51,8 +51,8 @@ describe("buildScreenshotCommand", () => {
 describe("sweepOldScreenshots", () => {
   it("deletes captures older than the retention window and keeps fresh ones", () => {
     const dir = makeTempDir();
-    const oldFile = join(dir, "winbridge-screenshot-old.png");
-    const freshFile = join(dir, "winbridge-screenshot-fresh.png");
+    const oldFile = join(dir, "winreach-screenshot-old.png");
+    const freshFile = join(dir, "winreach-screenshot-fresh.png");
     writeFileSync(oldFile, "old");
     writeFileSync(freshFile, "fresh");
 
@@ -67,7 +67,7 @@ describe("sweepOldScreenshots", () => {
     expect(existsSync(freshFile)).toBe(true);
   });
 
-  it("ignores files that are not WinBridge captures", () => {
+  it("ignores files that are not WinReach captures", () => {
     const dir = makeTempDir();
     const unrelated = join(dir, "important.txt");
     writeFileSync(unrelated, "keep me");
@@ -81,9 +81,9 @@ describe("sweepOldScreenshots", () => {
   });
 
   it("is a no-op for a missing directory or non-positive retention", () => {
-    expect(sweepOldScreenshots(join(tmpdir(), "winbridge-does-not-exist-xyz"), 1000)).toBe(0);
+    expect(sweepOldScreenshots(join(tmpdir(), "winreach-does-not-exist-xyz"), 1000)).toBe(0);
     const dir = makeTempDir();
-    writeFileSync(join(dir, "winbridge-screenshot-a.png"), "a");
+    writeFileSync(join(dir, "winreach-screenshot-a.png"), "a");
     expect(sweepOldScreenshots(dir, 0)).toBe(0);
   });
 });

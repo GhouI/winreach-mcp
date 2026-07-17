@@ -8,7 +8,7 @@
 //   no admin yet       -> create the first admin (signup)
 //   not signed in      -> sign in
 //   signed in          -> account manager (create / edit / rotate / delete /
-//                         export WINBRIDGE_PRINCIPALS)
+//                         export WINREACH_PRINCIPALS)
 
 import { Section, Warn, btnPrimary } from "@/components/ui";
 import { AuthGate } from "./auth-gate";
@@ -49,8 +49,8 @@ export function AccountsPanel({
     return (
       <Section title="Session secret required" desc="Sessions cannot be signed without a secret.">
         <Warn>
-          Set <code className="font-mono">WINBRIDGE_SESSION_SECRET</code> (or{" "}
-          <code className="font-mono">WINBRIDGE_DB_KEY</code>) on this host, then reload.
+          Set <code className="font-mono">WINREACH_SESSION_SECRET</code> (or{" "}
+          <code className="font-mono">WINREACH_DB_KEY</code>) on this host, then reload.
         </Warn>
       </Section>
     );

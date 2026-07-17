@@ -22,7 +22,7 @@ describe("parseClientArgs", () => {
 
 describe("resolveClientTargets", () => {
   it("keeps the default single target behavior", () => {
-    expect(resolveClientTargets({ PENDRAGON_TOKEN: "token" })).toEqual([
+    expect(resolveClientTargets({ WINREACH_TOKEN: "token" })).toEqual([
       {
         name: "default",
         url: "http://127.0.0.1:7573/mcp",
@@ -34,8 +34,8 @@ describe("resolveClientTargets", () => {
   it("resolves comma-separated urls with a shared token", () => {
     expect(
       resolveClientTargets({
-        PENDRAGON_TOKEN: "token",
-        PENDRAGON_URLS: "http://win-1:7573/mcp, http://win-2:7573/mcp"
+        WINREACH_TOKEN: "token",
+        WINREACH_URLS: "http://win-1:7573/mcp, http://win-2:7573/mcp"
       })
     ).toEqual([
       {
@@ -54,7 +54,7 @@ describe("resolveClientTargets", () => {
   it("resolves JSON targets with per-target token env vars", () => {
     expect(
       resolveClientTargets({
-        PENDRAGON_TARGETS: JSON.stringify([
+        WINREACH_TARGETS: JSON.stringify([
           {
             name: "build-runner",
             url: "http://win-1:7573/mcp",
@@ -87,8 +87,8 @@ describe("resolveClientTargets", () => {
     expect(
       resolveClientTargets(
         {
-          PENDRAGON_TOKEN: "token",
-          PENDRAGON_URLS: "http://ignored:7573/mcp"
+          WINREACH_TOKEN: "token",
+          WINREACH_URLS: "http://ignored:7573/mcp"
         },
         ["http://cli:7573/mcp"]
       )
@@ -101,32 +101,19 @@ describe("resolveClientTargets", () => {
     ]);
   });
 
-  it("prefers WINBRIDGE_ env vars", () => {
+  it("prefers WINREACH_ env vars", () => {
     expect(
       resolveClientTargets({
-        WINBRIDGE_TOKEN: "winbridge",
-        WINBRIDGE_URLS: "http://win-1:7573/mcp,http://win-2:7573/mcp"
+        WINREACH_TOKEN: "winreach",
+        WINREACH_URLS: "http://win-1:7573/mcp,http://win-2:7573/mcp"
       })
     ).toEqual([
-      { name: "target-1", url: "http://win-1:7573/mcp", token: "winbridge" },
-      { name: "target-2", url: "http://win-2:7573/mcp", token: "winbridge" }
-    ]);
-  });
-
-  it("lets WINBRIDGE_ override legacy PENDRAGON_ values", () => {
-    expect(
-      resolveClientTargets({
-        WINBRIDGE_TOKEN: "new",
-        PENDRAGON_TOKEN: "old",
-        WINBRIDGE_URL: "http://new:7573/mcp",
-        PENDRAGON_URL: "http://old:7573/mcp"
-      })
-    ).toEqual([
-      { name: "default", url: "http://new:7573/mcp", token: "new" }
+      { name: "target-1", url: "http://win-1:7573/mcp", token: "winreach" },
+      { name: "target-2", url: "http://win-2:7573/mcp", token: "winreach" }
     ]);
   });
 
   it("requires a token", () => {
-    expect(() => resolveClientTargets({})).toThrow("WINBRIDGE_TOKEN is required");
+    expect(() => resolveClientTargets({})).toThrow("WINREACH_TOKEN is required");
   });
 });

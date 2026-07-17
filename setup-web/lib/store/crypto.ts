@@ -2,7 +2,7 @@
 //
 //   Passwords  -> scrypt (salted, slow)                  : login
 //   Tokens     -> SHA-256 hash (fast, deterministic)     : agent auth / lookup
-//   At rest    -> AES-256-GCM (key from WINBRIDGE_DB_KEY) : reversible secrets
+//   At rest    -> AES-256-GCM (key from WINREACH_DB_KEY) : reversible secrets
 //
 // A stored bearer token is NEVER kept in plaintext: its SHA-256 hash is used to
 // authenticate, and (optionally) an AES-GCM-encrypted copy lets an operator
@@ -67,18 +67,18 @@ export function tokenHashEquals(a: string, b: string): boolean {
 /* --------------------------- encryption at rest --------------------------- */
 
 const MISSING_KEY =
-  "WINBRIDGE_DB_KEY is not set. Set a long random secret to encrypt data at rest.";
+  "WINREACH_DB_KEY is not set. Set a long random secret to encrypt data at rest.";
 
-/** Derive a 32-byte AES key from the WINBRIDGE_DB_KEY secret. */
+/** Derive a 32-byte AES key from the WINREACH_DB_KEY secret. */
 function encryptionKey(): Buffer {
-  const secret = process.env.WINBRIDGE_DB_KEY;
+  const secret = process.env.WINREACH_DB_KEY;
   if (!secret) throw new Error(MISSING_KEY);
   // Fixed salt: the derived key must be stable so ciphertext round-trips.
-  return scryptSync(secret, "winbridge-db-key", 32);
+  return scryptSync(secret, "winreach-db-key", 32);
 }
 
 export function encryptionAvailable(): boolean {
-  return Boolean(process.env.WINBRIDGE_DB_KEY);
+  return Boolean(process.env.WINREACH_DB_KEY);
 }
 
 /** AES-256-GCM encrypt -> `v1$ivhex$taghex$cipherhex`. */

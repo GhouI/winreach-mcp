@@ -1,6 +1,6 @@
 import React from "react";
 
-// Shared design tokens for the WinBridge demo video.
+// Shared design tokens for the WinReach demo video.
 // One consistent palette + type scale across every scene.
 export const theme = {
   bg0: "#0b0e16",

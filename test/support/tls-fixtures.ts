@@ -42,7 +42,7 @@ export function ensureTlsFixtures(): TlsFixtures | null {
     return cache;
   }
 
-  const dir = join(tmpdir(), `winbridge-tls-${process.pid}`);
+  const dir = join(tmpdir(), `winreach-tls-${process.pid}`);
   mkdirSync(dir, { recursive: true });
   const f = (name: string) => join(dir, name);
 
@@ -70,13 +70,13 @@ export function ensureTlsFixtures(): TlsFixtures | null {
     run([
       "req", "-x509", "-newkey", "rsa:2048", "-nodes",
       "-keyout", caKey, "-out", fixtures.clientCaCert,
-      "-days", "3650", "-subj", "/CN=WinBridge Test Client CA"
+      "-days", "3650", "-subj", "/CN=WinReach Test Client CA"
     ]);
     // Client cert signed by the client CA.
     run([
       "req", "-newkey", "rsa:2048", "-nodes",
       "-keyout", fixtures.clientKey, "-out", csr,
-      "-subj", "/CN=winbridge-test-client"
+      "-subj", "/CN=winreach-test-client"
     ]);
     run([
       "x509", "-req", "-in", csr,

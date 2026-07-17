@@ -61,7 +61,7 @@ export class FileTransferError extends Error {}
 
 function requireRoot(runtime: FileTransferRuntime): string {
   if (!runtime.root) {
-    throw new FileTransferError("File transfer is disabled: no WINBRIDGE_FILE_ROOT is configured.");
+    throw new FileTransferError("File transfer is disabled: no WINREACH_FILE_ROOT is configured.");
   }
   // Resolve symlinks in the root itself so containment checks compare real paths.
   return existsSync(runtime.root) ? realpathSync(runtime.root) : resolve(runtime.root);

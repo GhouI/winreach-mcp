@@ -12,7 +12,7 @@ import { PowerShellSessionManager } from "./powershell/session.js";
 import type { PowerShellResult } from "./powershell/types.js";
 import { registerTools, type ToolContext } from "./tools/index.js";
 
-export function createWinBridgeMcpServer(
+export function createWinReachMcpServer(
   config: AppConfig,
   sessions: PowerShellSessionManager,
   principal: Principal,
@@ -23,10 +23,10 @@ export function createWinBridgeMcpServer(
     version: config.version
   }, {
     instructions: [
-      "WinBridge provides headless PowerShell access to the Windows host running this MCP server.",
+      "WinReach provides headless PowerShell access to the Windows host running this MCP server.",
       "Use powershell_execute for isolated commands.",
       "Use powershell_open_session, powershell_send, and powershell_close_session when state must persist across commands, such as variables, imported modules, or working directory.",
-      "Commands run as the operating system user that launched WinBridge.",
+      "Commands run as the operating system user that launched WinReach.",
       "Command allow/deny policies may block some commands; blocked calls return an error explaining why.",
       "A principal may also be limited to a subset of tools; tools it cannot use are simply not offered.",
       "Treat every tool call as remote command execution and avoid sending secrets unless the operator explicitly intends that."
@@ -47,7 +47,7 @@ export function createWinBridgeMcpServer(
 /**
  * JSON body limit, sized to fit a base64-encoded `file_upload` payload plus the
  * JSON-RPC envelope. The SDK's `createMcpExpressApp` hardcodes body-parser's
- * 100 kB default, which would reject uploads far below `WINBRIDGE_MAX_FILE_BYTES`
+ * 100 kB default, which would reject uploads far below `WINREACH_MAX_FILE_BYTES`
  * with an opaque HTTP 413; this is why we build the app (and mount the parser)
  * ourselves.
  */
@@ -64,7 +64,7 @@ function jsonBodyLimitBytes(config: AppConfig): number {
 /**
  * Build the base Express app with localhost DNS-rebinding protection (mirroring
  * the SDK's createMcpExpressApp). Body parsing is intentionally NOT added here:
- * it is mounted after auth in createWinBridgeApp so an unauthenticated client
+ * it is mounted after auth in createWinReachApp so an unauthenticated client
  * cannot make the server buffer and parse a large (up to ~maxBytes*4/3) body.
  */
 function createMcpApp(config: AppConfig) {
@@ -75,13 +75,13 @@ function createMcpApp(config: AppConfig) {
   } else if (config.host === "0.0.0.0" || config.host === "::") {
     console.warn(
       `Warning: Server is binding to ${config.host} without DNS rebinding protection. ` +
-        "Restrict access with a firewall, WINBRIDGE_ALLOWED_ORIGINS, or a tunnel."
+        "Restrict access with a firewall, WINREACH_ALLOWED_ORIGINS, or a tunnel."
     );
   }
   return app;
 }
 
-export function createWinBridgeApp(config: AppConfig) {
+export function createWinReachApp(config: AppConfig) {
   const sessions = new PowerShellSessionManager(config);
   const audit = createAuditLogger(config.auditLogPath);
   const app = createMcpApp(config);
@@ -106,7 +106,7 @@ export function createWinBridgeApp(config: AppConfig) {
       return;
     }
 
-    const server = createWinBridgeMcpServer(config, sessions, principal, audit);
+    const server = createWinReachMcpServer(config, sessions, principal, audit);
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined
     });

@@ -60,7 +60,7 @@ export function cloudflaredAssetName(platform: NodeJS.Platform, arch: string): s
 
   throw new Error(
     `Automatic cloudflared install is not supported on ${platform}/${arch}. ` +
-      "Install cloudflared manually (e.g. 'brew install cloudflared') and set WINBRIDGE_CLOUDFLARED_PATH."
+      "Install cloudflared manually (e.g. 'brew install cloudflared') and set WINREACH_CLOUDFLARED_PATH."
   );
 }
 
@@ -70,7 +70,7 @@ function cloudflaredDownloadUrl(assetName: string): string {
 
 function cacheBinaryPath(platform: NodeJS.Platform): string {
   const name = platform === "win32" ? "cloudflared.exe" : "cloudflared";
-  return join(homedir(), ".winbridge", "bin", name);
+  return join(homedir(), ".winreach", "bin", name);
 }
 
 function isOnPath(command: string): boolean {
@@ -121,7 +121,7 @@ export async function resolveCloudflaredBinary(options: {
 }): Promise<string> {
   if (options.binaryPath) {
     if (!existsSync(options.binaryPath)) {
-      throw new Error(`cloudflared not found at WINBRIDGE_CLOUDFLARED_PATH: ${options.binaryPath}`);
+      throw new Error(`cloudflared not found at WINREACH_CLOUDFLARED_PATH: ${options.binaryPath}`);
     }
     return options.binaryPath;
   }
@@ -138,7 +138,7 @@ export async function resolveCloudflaredBinary(options: {
   if (!options.autoInstall) {
     throw new Error(
       "cloudflared is not installed. Install it and retry, or enable auto-install by leaving " +
-        "WINBRIDGE_TUNNEL_AUTOINSTALL unset (it defaults to on)."
+        "WINREACH_TUNNEL_AUTOINSTALL unset (it defaults to on)."
     );
   }
 

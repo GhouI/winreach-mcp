@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
   try {
     store = await getStore();
   } catch (err) {
-    // e.g. WINBRIDGE_DB_KEY missing/incorrect so the persisted URL can't decrypt.
+    // e.g. WINREACH_DB_KEY missing/incorrect so the persisted URL can't decrypt.
     return NextResponse.json({
       dbConfigured: true,
       schemaReady: false,

@@ -105,8 +105,8 @@ export class SqliteStore implements AccountStore {
     let created = false;
     const missing: string[] = [];
 
-    if (!this.tableExists(db, "winbridge_admins")) {
-      db.exec(`CREATE TABLE IF NOT EXISTS winbridge_admins (
+    if (!this.tableExists(db, "winreach_admins")) {
+      db.exec(`CREATE TABLE IF NOT EXISTS winreach_admins (
         id TEXT PRIMARY KEY,
         username TEXT UNIQUE NOT NULL,
         password_hash TEXT NOT NULL,
@@ -114,11 +114,11 @@ export class SqliteStore implements AccountStore {
       )`);
       created = true;
     } else {
-      missing.push(...missingFields(this.columns(db, "winbridge_admins"), REQUIRED_ADMIN_FIELDS));
+      missing.push(...missingFields(this.columns(db, "winreach_admins"), REQUIRED_ADMIN_FIELDS));
     }
 
-    if (!this.tableExists(db, "winbridge_users")) {
-      db.exec(`CREATE TABLE IF NOT EXISTS winbridge_users (
+    if (!this.tableExists(db, "winreach_users")) {
+      db.exec(`CREATE TABLE IF NOT EXISTS winreach_users (
         id TEXT PRIMARY KEY,
         name TEXT UNIQUE NOT NULL,
         role TEXT NOT NULL,
@@ -133,15 +133,15 @@ export class SqliteStore implements AccountStore {
       )`);
       created = true;
     } else {
-      missing.push(...missingFields(this.columns(db, "winbridge_users"), REQUIRED_USER_FIELDS));
+      missing.push(...missingFields(this.columns(db, "winreach_users"), REQUIRED_USER_FIELDS));
     }
 
-    db.exec(`CREATE TABLE IF NOT EXISTS winbridge_meta (
+    db.exec(`CREATE TABLE IF NOT EXISTS winreach_meta (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
     )`);
     db.prepare(
-      "INSERT INTO winbridge_meta (key, value) VALUES ('schema_version', ?) " +
+      "INSERT INTO winreach_meta (key, value) VALUES ('schema_version', ?) " +
         "ON CONFLICT(key) DO UPDATE SET value = excluded.value",
     ).run(String(SCHEMA_VERSION));
 
@@ -160,7 +160,7 @@ export class SqliteStore implements AccountStore {
 
   private readVersion(db: DatabaseSync): number | undefined {
     try {
-      const row = db.prepare("SELECT value FROM winbridge_meta WHERE key='schema_version'").get();
+      const row = db.prepare("SELECT value FROM winreach_meta WHERE key='schema_version'").get();
       return row ? Number((row as Row).value) : undefined;
     } catch {
       return undefined;
@@ -170,12 +170,12 @@ export class SqliteStore implements AccountStore {
   async status(): Promise<StoreStatus> {
     const db = await this.connect();
     const missing: string[] = [];
-    const adminsExist = this.tableExists(db, "winbridge_admins");
-    const usersExist = this.tableExists(db, "winbridge_users");
-    if (!adminsExist) missing.push("winbridge_admins");
-    else missing.push(...missingFields(this.columns(db, "winbridge_admins"), REQUIRED_ADMIN_FIELDS));
-    if (!usersExist) missing.push("winbridge_users");
-    else missing.push(...missingFields(this.columns(db, "winbridge_users"), REQUIRED_USER_FIELDS));
+    const adminsExist = this.tableExists(db, "winreach_admins");
+    const usersExist = this.tableExists(db, "winreach_users");
+    if (!adminsExist) missing.push("winreach_admins");
+    else missing.push(...missingFields(this.columns(db, "winreach_admins"), REQUIRED_ADMIN_FIELDS));
+    if (!usersExist) missing.push("winreach_users");
+    else missing.push(...missingFields(this.columns(db, "winreach_users"), REQUIRED_USER_FIELDS));
     const schemaReady = adminsExist && usersExist && missing.length === 0;
     return {
       connected: true,
@@ -197,7 +197,7 @@ export class SqliteStore implements AccountStore {
   // --- admins ---
   async countAdmins(): Promise<number> {
     const db = await this.connect();
-    const row = db.prepare("SELECT COUNT(*) AS n FROM winbridge_admins").get() as Row;
+    const row = db.prepare("SELECT COUNT(*) AS n FROM winreach_admins").get() as Row;
     return Number(row.n);
   }
 
@@ -205,20 +205,20 @@ export class SqliteStore implements AccountStore {
     const db = await this.connect();
     const admin: AdminAccount = { id: newId(), username, passwordHash, createdAt: nowIso() };
     db.prepare(
-      "INSERT INTO winbridge_admins (id, username, password_hash, created_at) VALUES (?, ?, ?, ?)",
+      "INSERT INTO winreach_admins (id, username, password_hash, created_at) VALUES (?, ?, ?, ?)",
     ).run(admin.id, admin.username, admin.passwordHash, admin.createdAt);
     return admin;
   }
 
   async getAdminByUsername(username: string): Promise<AdminAccount | null> {
     const db = await this.connect();
-    const row = db.prepare("SELECT * FROM winbridge_admins WHERE username = ?").get(username);
+    const row = db.prepare("SELECT * FROM winreach_admins WHERE username = ?").get(username);
     return row ? mapAdmin(row as Row) : null;
   }
 
   async getAdminById(id: string): Promise<AdminAccount | null> {
     const db = await this.connect();
-    const row = db.prepare("SELECT * FROM winbridge_admins WHERE id = ?").get(id);
+    const row = db.prepare("SELECT * FROM winreach_admins WHERE id = ?").get(id);
     return row ? mapAdmin(row as Row) : null;
   }
 
@@ -226,20 +226,20 @@ export class SqliteStore implements AccountStore {
   async listUsers(): Promise<AccountUser[]> {
     const db = await this.connect();
     return db
-      .prepare("SELECT * FROM winbridge_users ORDER BY created_at ASC")
+      .prepare("SELECT * FROM winreach_users ORDER BY created_at ASC")
       .all()
       .map((r) => mapUser(r as Row));
   }
 
   async getUserById(id: string): Promise<AccountUser | null> {
     const db = await this.connect();
-    const row = db.prepare("SELECT * FROM winbridge_users WHERE id = ?").get(id);
+    const row = db.prepare("SELECT * FROM winreach_users WHERE id = ?").get(id);
     return row ? mapUser(row as Row) : null;
   }
 
   async getUserByTokenHash(tokenHash: string): Promise<AccountUser | null> {
     const db = await this.connect();
-    const row = db.prepare("SELECT * FROM winbridge_users WHERE token_hash = ?").get(tokenHash);
+    const row = db.prepare("SELECT * FROM winreach_users WHERE token_hash = ?").get(tokenHash);
     return row ? mapUser(row as Row) : null;
   }
 
@@ -259,7 +259,7 @@ export class SqliteStore implements AccountStore {
       lastUsedAt: null,
     };
     db.prepare(
-      `INSERT INTO winbridge_users
+      `INSERT INTO winreach_users
         (id, name, role, token_hash, token_enc, tools, allow, deny, enabled, created_at, last_used_at)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
@@ -290,19 +290,19 @@ export class SqliteStore implements AccountStore {
     }
     if (sets.length > 0) {
       values.push(id);
-      db.prepare(`UPDATE winbridge_users SET ${sets.join(", ")} WHERE id = ?`).run(...values);
+      db.prepare(`UPDATE winreach_users SET ${sets.join(", ")} WHERE id = ?`).run(...values);
     }
     return this.getUserById(id);
   }
 
   async deleteUser(id: string): Promise<boolean> {
     const db = await this.connect();
-    const res = db.prepare("DELETE FROM winbridge_users WHERE id = ?").run(id);
+    const res = db.prepare("DELETE FROM winreach_users WHERE id = ?").run(id);
     return Number(res.changes) > 0;
   }
 
   async touchUser(id: string, whenIso: string): Promise<void> {
     const db = await this.connect();
-    db.prepare("UPDATE winbridge_users SET last_used_at = ? WHERE id = ?").run(whenIso, id);
+    db.prepare("UPDATE winreach_users SET last_used_at = ? WHERE id = ?").run(whenIso, id);
   }
 }

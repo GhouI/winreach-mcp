@@ -1,10 +1,10 @@
 "use client";
 
-// Editor for the multi-user (WINBRIDGE_PRINCIPALS) access model. Controlled:
+// Editor for the multi-user (WINREACH_PRINCIPALS) access model. Controlled:
 // all state lives in the wizard and flows in via `users` / `onChange`.
 
 import { useState } from "react";
-import { ROLE_PRESETS, TOOL_NAMES, generateToken } from "@/lib/winbridge-config";
+import { ROLE_PRESETS, TOOL_NAMES, generateToken } from "@/lib/winreach-config";
 import { newUser, type FormUser } from "@/lib/form-state";
 import { Field, Select, TextArea, TextInput, Toggle, Warn } from "@/components/ui";
 

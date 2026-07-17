@@ -1,4 +1,4 @@
-import { ROLE_PRESETS, parseList } from "@/lib/winbridge-config";
+import { ROLE_PRESETS, parseList } from "@/lib/winreach-config";
 
 /** Bootstrap state reported by /api/auth/session. */
 export type Boot = {

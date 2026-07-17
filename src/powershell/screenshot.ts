@@ -22,10 +22,10 @@ const FORMAT_META: Record<ScreenshotFormat, FormatMeta> = {
 };
 
 /** Filename prefix for every capture, used to scope the retention sweep. */
-const SCREENSHOT_PREFIX = "winbridge-screenshot-";
+const SCREENSHOT_PREFIX = "winreach-screenshot-";
 
 export function defaultScreenshotDir(): string {
-  return join(tmpdir(), "winbridge-screenshots");
+  return join(tmpdir(), "winreach-screenshots");
 }
 
 /**
@@ -125,7 +125,7 @@ function removeIfPresent(path: string): void {
  * immediately.
  *
  * Screen capture requires an active, interactive desktop session. When
- * WinBridge runs in a non-interactive service context (session 0) the capture
+ * WinReach runs in a non-interactive service context (session 0) the capture
  * fails; the returned result carries `success: false` and the PowerShell error.
  */
 export async function captureScreenshot(

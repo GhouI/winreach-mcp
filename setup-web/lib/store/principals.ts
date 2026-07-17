@@ -1,7 +1,7 @@
-// Build the WINBRIDGE_PRINCIPALS JSON from stored account users. Mirrors the
-// shape of buildPrincipalsJson() in lib/winbridge-config.ts, but emits each
+// Build the WINREACH_PRINCIPALS JSON from stored account users. Mirrors the
+// shape of buildPrincipalsJson() in lib/winreach-config.ts, but emits each
 // entry's `tokenHash` (SHA-256 of the bearer token) instead of a plaintext
-// token — the WinBridge server authenticates by hashing the presented token and
+// token — the WinReach server authenticates by hashing the presented token and
 // comparing it to this value. Only enabled users are exported.
 
 import type { AccountUser } from "@/lib/store/types";

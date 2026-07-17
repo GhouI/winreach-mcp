@@ -1,8 +1,8 @@
 // Server-only persistence for the chosen database backend.
 //
-// Stored at data/winbridge-db.json next to the app (this app runs on the
+// Stored at data/winreach-db.json next to the app (this app runs on the
 // Windows host itself). The connection string / URL is ENCRYPTED at rest with
-// encryptAtRest() (AES-256-GCM, key from WINBRIDGE_DB_KEY); the SQLite file path
+// encryptAtRest() (AES-256-GCM, key from WINREACH_DB_KEY); the SQLite file path
 // is not a secret and is stored in the clear. A live AccountStore is built from
 // the persisted config on demand and cached for reuse.
 
@@ -33,7 +33,7 @@ export type DbConfigMeta = {
 };
 
 function storePath(): string {
-  return path.join(process.cwd(), "data", "winbridge-db.json");
+  return path.join(process.cwd(), "data", "winreach-db.json");
 }
 
 /** Encryption is required for any backend whose config contains a secret URL. */
@@ -58,7 +58,7 @@ export async function writeDbConfig(config: StoreConfig): Promise<void> {
   } else {
     if (!encryptionAvailable()) {
       throw new Error(
-        "WINBRIDGE_DB_KEY is not set. It is required to encrypt the connection string at rest for non-SQLite backends.",
+        "WINREACH_DB_KEY is not set. It is required to encrypt the connection string at rest for non-SQLite backends.",
       );
     }
     doc.urlEnc = encryptAtRest(config.url);
@@ -75,10 +75,10 @@ export async function readDbConfig(): Promise<StoreConfig | null> {
   const doc = await readRaw();
   if (!doc) return null;
   if (doc.kind === "sqlite") {
-    return { kind: "sqlite", file: doc.file ?? "data/winbridge.sqlite" };
+    return { kind: "sqlite", file: doc.file ?? "data/winreach.sqlite" };
   }
   if (!doc.urlEnc) return null;
-  const url = decryptAtRest(doc.urlEnc); // throws if WINBRIDGE_DB_KEY is wrong/missing
+  const url = decryptAtRest(doc.urlEnc); // throws if WINREACH_DB_KEY is wrong/missing
   if (doc.kind === "mongodb") return { kind: "mongodb", url, database: doc.database };
   return { kind: doc.kind, url };
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { ROLE_PRESETS, TOOL_NAMES } from "@/lib/winbridge-config";
+import { ROLE_PRESETS, TOOL_NAMES } from "@/lib/winreach-config";
 import { Field, Grid, Select, TextArea, TextInput, Toggle } from "@/components/ui";
 import { ROLES, type Draft } from "./types";
 
