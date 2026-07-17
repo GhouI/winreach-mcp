@@ -36,6 +36,7 @@ function makeConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     principals: [createPrimaryPrincipal("admin-token", { allow: [], deny: [] })],
     globalPolicy: { allow: [], deny: compilePatterns(["Remove-Item", "Format-Volume"], "deny") },
     screenshot: { enabled: false, allowedRoles: [], dir: join(tmpdir(), "winbridge-shots-test"), retentionMs: 0 },
+    computerUse: { enabled: false, allowedRoles: [], keyDenylist: [], maxActionsPerSec: 10, auditText: false },
     fileTransfer: { enabled: false, maxBytes: 50 * 1024 * 1024 },
     allowedOrigins: [],
     defaultCwd: process.cwd(),
@@ -336,6 +337,65 @@ describe("take_screenshot gating", () => {
   it("does not register the tool when the principal's role is not permitted", async () => {
     const names = await listToolNames(makeConfig({ screenshot: screenshot(true, ["operator"]) }), admin());
     expect(names).not.toContain("take_screenshot");
+  });
+});
+
+describe("computer_use gating", () => {
+  const cu = (enabled: boolean, allowedRoles: string[] = []) => ({
+    enabled,
+    allowedRoles,
+    keyDenylist: [],
+    maxActionsPerSec: 10,
+    auditText: false
+  });
+
+  async function listToolNames(config: AppConfig, principal: Principal): Promise<string[]> {
+    const sessions = new PowerShellSessionManager(config);
+    const server = createWinBridgeMcpServer(config, sessions, principal, createAuditLogger(undefined));
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: "test-client", version: "0.0.0" });
+    await Promise.all([client.connect(clientTransport), server.connect(serverTransport)]);
+    cleanups.push(() => {
+      sessions.closeAll();
+      void client.close();
+      void server.close();
+    });
+    const { tools } = await client.listTools();
+    return tools.map((tool) => tool.name);
+  }
+
+  const admin = () => createPrimaryPrincipal("admin-token", { allow: [], deny: [] });
+
+  it("is off by default (not registered when disabled)", async () => {
+    const names = await listToolNames(makeConfig({ computerUse: cu(false) }), admin());
+    expect(names).not.toContain("computer_use");
+  });
+
+  it("registers when enabled with no role restriction", async () => {
+    const names = await listToolNames(makeConfig({ computerUse: cu(true) }), admin());
+    expect(names).toContain("computer_use");
+  });
+
+  it("registers when the principal's role is permitted", async () => {
+    const names = await listToolNames(makeConfig({ computerUse: cu(true, ["admin"]) }), admin());
+    expect(names).toContain("computer_use");
+  });
+
+  it("is withheld when the principal's role is not permitted", async () => {
+    const names = await listToolNames(makeConfig({ computerUse: cu(true, ["operator"]) }), admin());
+    expect(names).not.toContain("computer_use");
+  });
+
+  it("is withheld when the principal's tool allowlist excludes it", async () => {
+    const restricted: Principal = {
+      name: "scoped",
+      role: "admin",
+      token: "scoped-token",
+      policy: { allow: [], deny: [] },
+      tools: ["powershell_execute"]
+    };
+    const names = await listToolNames(makeConfig({ computerUse: cu(true) }), restricted);
+    expect(names).not.toContain("computer_use");
   });
 });
 

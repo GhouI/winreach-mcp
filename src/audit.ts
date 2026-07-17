@@ -22,6 +22,18 @@ export type AuditEntry = {
   bytes?: number;
   /** Server-side path a take_screenshot capture was written to. */
   path?: string;
+  /** computer_use: the input action performed (mouse_move, type, key, ...). */
+  action?: string;
+  /** computer_use: target coordinate, when the action has one. */
+  coordinate?: { x: number; y: number };
+  /** computer_use: the key chord, for `key` actions. */
+  keys?: string;
+  /** computer_use: length of typed text (raw text is not logged unless opted in). */
+  textLength?: number;
+  /** computer_use: SHA-256 (truncated) of typed text, so a value is auditable without storing it. */
+  textHash?: string;
+  /** computer_use: the raw typed text, only when WINBRIDGE_COMPUTER_USE_AUDIT_TEXT is set. */
+  text?: string;
 };
 
 export interface AuditLogger {
