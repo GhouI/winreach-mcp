@@ -84,18 +84,6 @@ export function Onboarding({
 
   return (
     <div className="mx-auto max-w-2xl">
-      {/* ---- Hero ---- */}
-      <div className="mb-8">
-        <p className="eyebrow mb-3">Set up WinBridge</p>
-        <h1 className="text-[28px] font-semibold leading-tight tracking-tight sm:text-[32px]">
-          Configure your server, step by step
-        </h1>
-        <p className="mt-3 max-w-prose text-[14px] leading-relaxed text-muted">
-          Six short steps. Fill in each one and click Next — on the last step you apply the
-          configuration to this host and open the console.
-        </p>
-      </div>
-
       {/* ---- Top numbered step indicator ---- */}
       <div className="mb-9">
         <Stepper steps={STEPS.map((s) => s.title)} current={step} onSelect={setStep} />

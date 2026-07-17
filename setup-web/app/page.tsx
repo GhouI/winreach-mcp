@@ -133,19 +133,14 @@ export default function Home() {
   return (
     <div className="flex min-h-full flex-col">
       {/* ---- Top bar ---- */}
-      <header className="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur">
+      <header className="sticky top-0 z-40 bg-background/90 backdrop-blur">
         <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between px-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-2.5">
             <span aria-hidden className="size-2.5 shrink-0 bg-accent" />
             <span className="truncate text-sm font-semibold tracking-tight">WinBridge</span>
             <span className="text-sm text-faint">MCP</span>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="eyebrow hidden sm:inline">
-              {phase === "dashboard" ? "Console" : phase === "onboarding" ? "Setup" : ""}
-            </span>
-            {phase === "dashboard" && <ConsoleButton onOpen={() => setConsoleOpen(true)} />}
-          </div>
+          {phase === "dashboard" && <ConsoleButton onOpen={() => setConsoleOpen(true)} />}
         </div>
       </header>
 
