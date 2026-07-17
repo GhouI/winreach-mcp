@@ -36,6 +36,47 @@ Most coding agents are comfortable in terminals, but Windows RDP is a GUI-first 
 - Test locally with a diagnostic client before connecting a real agent.
 - Avoid IIS: WinReach is a standalone Node HTTP server.
 
+## Install & Connect (npx)
+
+No clone, no build. WinReach ships as an npm package with a `winreach-mcp` binary.
+
+**1. Generate a token:**
+
+```powershell
+npx winreach-mcp gen-token
+# -> a fresh random bearer token, e.g. 9V4P3Am6EjKsMJVetyrl-s60NVcP_MmDvsP_gFgcq3U
+```
+
+**2a. Local, zero-config (stdio) — fastest path.** Any stdio MCP client can launch WinReach directly on the Windows machine. No HTTP, no tunnel, no token wrangling (an ephemeral admin token is minted if you don't set one):
+
+```jsonc
+{
+  "mcpServers": {
+    "winreach": {
+      "command": "npx",
+      "args": ["-y", "winreach-mcp", "--stdio"]
+    }
+  }
+}
+```
+
+**2b. Remote (HTTP + bearer token).** Run the server on the Windows host and connect agents over the network (optionally via the built-in Cloudflare tunnel):
+
+```powershell
+$env:WINREACH_TOKEN = "PASTE_TOKEN_FROM_STEP_1"
+npx winreach-mcp            # add --tunnel to publish a public Cloudflare URL
+```
+
+Copy-paste snippets for **Claude Code, Claude Desktop, Codex, and Cursor** (both local stdio and remote HTTP forms), plus the Claude Desktop one-click extension, are in **[docs/CONNECT.md](docs/CONNECT.md)**.
+
+The `winreach-mcp` CLI:
+
+| Command | What it does |
+| --- | --- |
+| `npx winreach-mcp` (or `start`) | Start the Streamable-HTTP MCP server (default; add `--tunnel` for a public URL). |
+| `npx winreach-mcp --stdio` | Run over the local stdio transport for an MCP client that launches it. |
+| `npx winreach-mcp gen-token` | Print a fresh random bearer token. |
+
 ## Tooling
 
 WinReach exposes up to eight MCP tools (the last three are opt-in):
@@ -197,6 +238,10 @@ Notes:
 - Auto-install downloads and runs the official `cloudflared` binary from GitHub releases over HTTPS. If you need a verified/pinned binary, set `WINREACH_TUNNEL_AUTOINSTALL=0` and point `WINREACH_CLOUDFLARED_PATH` at a `cloudflared` you installed and checked yourself.
 
 ## Connect Agents
+
+Copy-paste snippets for Claude Code, Claude Desktop, Codex, and Cursor (local
+stdio and remote HTTP forms) plus the one-click Claude Desktop extension:
+**[docs/CONNECT.md](docs/CONNECT.md)**.
 
 Full setup guide: [Install WinReach and Connect Agents](docs/INSTALL_AND_AGENT_USAGE.md)
 

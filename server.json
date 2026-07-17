@@ -1,0 +1,74 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.GhouI/winreach-mcp",
+  "description": "Secure MCP bridge for PowerShell, screenshots, file transfer, and computer_use on Windows hosts.",
+  "version": "0.2.0",
+  "repository": {
+    "url": "https://github.com/GhouI/winreach-mcp",
+    "source": "github"
+  },
+  "websiteUrl": "https://github.com/GhouI/winreach-mcp#readme",
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "winreach-mcp",
+      "version": "0.2.0",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "--stdio",
+          "description": "Run WinReach over the local stdio transport."
+        }
+      ],
+      "environmentVariables": [
+        {
+          "name": "WINREACH_TOKEN",
+          "description": "Bearer token for the implicit local admin principal. If omitted in stdio mode, an ephemeral in-memory token is minted for the session.",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "WINREACH_ALLOW_SCREENSHOT",
+          "description": "Set to 1/true to enable the take_screenshot tool (disabled by default).",
+          "isRequired": false,
+          "default": "false"
+        },
+        {
+          "name": "WINREACH_ALLOW_COMPUTER_USE",
+          "description": "Set to 1/true to enable the computer_use desktop input tool (disabled by default).",
+          "isRequired": false,
+          "default": "false"
+        },
+        {
+          "name": "WINREACH_FILE_ROOT",
+          "description": "Absolute directory that enables and sandboxes the file_upload/file_download tools. Unset disables file transfer.",
+          "isRequired": false
+        },
+        {
+          "name": "WINREACH_AUDIT_LOG",
+          "description": "Path to a JSONL audit log. Unset disables auditing.",
+          "isRequired": false
+        }
+      ]
+    }
+  ],
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://your-winreach-host.example.com/mcp",
+      "headers": [
+        {
+          "name": "Authorization",
+          "description": "Bearer <WINREACH_TOKEN> for the remote WinReach HTTP server.",
+          "isRequired": true,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}
