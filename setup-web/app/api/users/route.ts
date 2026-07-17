@@ -1,7 +1,7 @@
 // Account (user / agent-key) collection endpoint. Session-protected.
 //
 //   GET  /api/users                    -> list users (no secrets)
-//   GET  /api/users?format=principals  -> WINBRIDGE_PRINCIPALS JSON (tokenHash)
+//   GET  /api/users?format=principals  -> WINREACH_PRINCIPALS JSON (tokenHash)
 //   POST /api/users                    -> create; returns the plaintext token ONCE
 //
 // On create the server generates the token, stores only its SHA-256 hash

@@ -9,7 +9,7 @@ import type { ApiUser } from "./types";
 
 /**
  * Signed-in account manager: create / edit / rotate / delete keys and export
- * the WINBRIDGE_PRINCIPALS env value.
+ * the WINREACH_PRINCIPALS env value.
  */
 export function Manager({ username, onBootChange }: { username: string; onBootChange: () => void }) {
   const [users, setUsers] = useState<ApiUser[]>([]);
@@ -51,7 +51,7 @@ export function Manager({ username, onBootChange }: { username: string; onBootCh
     <div className="space-y-5">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <p className="max-w-prose text-[13px] leading-relaxed text-muted">
-          Each account is one agent key (a WINBRIDGE_PRINCIPALS entry). Keys are shown once
+          Each account is one agent key (a WINREACH_PRINCIPALS entry). Keys are shown once
           at creation — only a hash is stored.
         </p>
         <p className="flex shrink-0 items-baseline gap-3 text-xs text-muted">
@@ -104,13 +104,13 @@ export function Manager({ username, onBootChange }: { username: string; onBootCh
       </Section>
 
       <Section
-        title="Export WINBRIDGE_PRINCIPALS"
+        title="Export WINREACH_PRINCIPALS"
         desc="Built from the stored tokenHash of each enabled account. Paste into your server env."
       >
         <button type="button" onClick={exportPrincipals} className={btnSecondary}>
           Generate principals JSON
         </button>
-        {principals !== null && <CodeBlock label="WINBRIDGE_PRINCIPALS" text={principals} />}
+        {principals !== null && <CodeBlock label="WINREACH_PRINCIPALS" text={principals} />}
       </Section>
     </div>
   );

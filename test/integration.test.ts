@@ -12,7 +12,7 @@ import { createAuditLogger } from "../src/audit.js";
 import { compilePatterns } from "../src/policy.js";
 import { createPrimaryPrincipal, parsePrincipals, type Principal } from "../src/principals.js";
 import { createServerForApp, type TlsConfig } from "../src/tls.js";
-import { createWinBridgeApp, createWinBridgeMcpServer } from "../src/mcpServer.js";
+import { createWinReachApp, createWinReachMcpServer } from "../src/mcpServer.js";
 import { PowerShellSessionManager } from "../src/powershell/session.js";
 import type { AppConfig } from "../src/config.js";
 import { ensureTlsFixtures } from "./support/tls-fixtures.js";
@@ -28,14 +28,14 @@ afterEach(() => {
 
 function makeConfig(overrides: Partial<AppConfig> = {}): AppConfig {
   return {
-    name: "winbridge-mcp",
+    name: "winreach-mcp",
     version: "0.0.0-test",
     host: "127.0.0.1",
     port: 0,
     endpointPath: "/mcp",
     principals: [createPrimaryPrincipal("admin-token", { allow: [], deny: [] })],
     globalPolicy: { allow: [], deny: compilePatterns(["Remove-Item", "Format-Volume"], "deny") },
-    screenshot: { enabled: false, allowedRoles: [], dir: join(tmpdir(), "winbridge-shots-test"), retentionMs: 0 },
+    screenshot: { enabled: false, allowedRoles: [], dir: join(tmpdir(), "winreach-shots-test"), retentionMs: 0 },
     computerUse: { enabled: false, allowedRoles: [], keyDenylist: [], maxActionsPerSec: 10, auditText: false },
     fileTransfer: { enabled: false, maxBytes: 50 * 1024 * 1024 },
     allowedOrigins: [],
@@ -89,7 +89,7 @@ function httpsPost(
 
 describe("HTTP bearer auth + guards", () => {
   it("rejects missing, wrong tokens, bad origins, and wrong methods", async () => {
-    const { app } = createWinBridgeApp(makeConfig({ allowedOrigins: ["http://allowed.example"] }));
+    const { app } = createWinReachApp(makeConfig({ allowedOrigins: ["http://allowed.example"] }));
     const { server } = createServerForApp(app, undefined);
     const port = await listen(server);
     const base = `http://127.0.0.1:${port}/mcp`;
@@ -118,7 +118,7 @@ describe("HTTP bearer auth + guards", () => {
 
   it("rejects an oversized unauthenticated body with 401, not 413 (auth runs before body parsing)", async () => {
     // File transfer disabled here, so the JSON body limit is the 100 kB default.
-    const { app } = createWinBridgeApp(makeConfig());
+    const { app } = createWinReachApp(makeConfig());
     const { server } = createServerForApp(app, undefined);
     const port = await listen(server);
 
@@ -147,7 +147,7 @@ describeTls("in-app TLS and mutual TLS", () => {
   const serverCa = () => readFileSync(fx.serverCert);
 
   it("rejects a client with no certificate when mTLS is on", async () => {
-    const { app } = createWinBridgeApp(makeConfig());
+    const { app } = createWinReachApp(makeConfig());
     const { server, scheme } = createServerForApp(app, mtls);
     expect(scheme).toBe("https");
     const port = await listen(server);
@@ -156,7 +156,7 @@ describeTls("in-app TLS and mutual TLS", () => {
   });
 
   it("accepts a client with a valid certificate, then still enforces the bearer token", async () => {
-    const { app } = createWinBridgeApp(makeConfig());
+    const { app } = createWinReachApp(makeConfig());
     const { server } = createServerForApp(app, mtls);
     const port = await listen(server);
 
@@ -175,7 +175,7 @@ describeTls("in-app TLS and mutual TLS", () => {
       JSON.stringify([{ name: "hashed", role: "admin", tokenHash }]),
       {}
     );
-    const { app } = createWinBridgeApp(makeConfig({ principals: [hashed] }));
+    const { app } = createWinReachApp(makeConfig({ principals: [hashed] }));
     const { server } = createServerForApp(app, undefined);
     const port = await listen(server);
     const base = `http://127.0.0.1:${port}/mcp`;
@@ -214,7 +214,7 @@ describeTls("in-app TLS and mutual TLS", () => {
 
 describe("MCP tool calls: policy + audit", () => {
   function tempAudit(): string {
-    const dir = mkdtempSync(join(tmpdir(), "winbridge-int-"));
+    const dir = mkdtempSync(join(tmpdir(), "winreach-int-"));
     cleanups.push(() => rmSync(dir, { recursive: true, force: true }));
     return join(dir, "audit.jsonl");
   }
@@ -222,7 +222,7 @@ describe("MCP tool calls: policy + audit", () => {
   async function connectClient(config: AppConfig, principal: Principal, auditPath: string) {
     const sessions = new PowerShellSessionManager(config);
     const audit = createAuditLogger(auditPath);
-    const server = createWinBridgeMcpServer(config, sessions, principal, audit);
+    const server = createWinReachMcpServer(config, sessions, principal, audit);
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
     const client = new Client({ name: "test-client", version: "0.0.0" });
     await Promise.all([client.connect(clientTransport), server.connect(serverTransport)]);
@@ -296,14 +296,14 @@ describe("take_screenshot gating", () => {
   const screenshot = (enabled: boolean, allowedRoles: string[]) => ({
     enabled,
     allowedRoles,
-    dir: join(tmpdir(), "winbridge-shots-test"),
+    dir: join(tmpdir(), "winreach-shots-test"),
     retentionMs: 0
   });
 
   async function listToolNames(config: AppConfig, principal: Principal): Promise<string[]> {
     const sessions = new PowerShellSessionManager(config);
     const audit = createAuditLogger(undefined);
-    const server = createWinBridgeMcpServer(config, sessions, principal, audit);
+    const server = createWinReachMcpServer(config, sessions, principal, audit);
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
     const client = new Client({ name: "test-client", version: "0.0.0" });
     await Promise.all([client.connect(clientTransport), server.connect(serverTransport)]);
@@ -351,7 +351,7 @@ describe("computer_use gating", () => {
 
   async function listToolNames(config: AppConfig, principal: Principal): Promise<string[]> {
     const sessions = new PowerShellSessionManager(config);
-    const server = createWinBridgeMcpServer(config, sessions, principal, createAuditLogger(undefined));
+    const server = createWinReachMcpServer(config, sessions, principal, createAuditLogger(undefined));
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
     const client = new Client({ name: "test-client", version: "0.0.0" });
     await Promise.all([client.connect(clientTransport), server.connect(serverTransport)]);
@@ -403,7 +403,7 @@ describe("file transfer gating", () => {
   async function listToolNames(config: AppConfig, principal: Principal): Promise<string[]> {
     const sessions = new PowerShellSessionManager(config);
     const audit = createAuditLogger(undefined);
-    const server = createWinBridgeMcpServer(config, sessions, principal, audit);
+    const server = createWinReachMcpServer(config, sessions, principal, audit);
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
     const client = new Client({ name: "test-client", version: "0.0.0" });
     await Promise.all([client.connect(clientTransport), server.connect(serverTransport)]);
@@ -426,7 +426,7 @@ describe("file transfer gating", () => {
 
   it("registers both tools when a root is configured", async () => {
     const config = makeConfig({
-      fileTransfer: { enabled: true, root: join(tmpdir(), "winbridge-files-test"), maxBytes: 1024 }
+      fileTransfer: { enabled: true, root: join(tmpdir(), "winreach-files-test"), maxBytes: 1024 }
     });
     const names = await listToolNames(config, admin());
     expect(names).toContain("file_upload");
@@ -434,9 +434,9 @@ describe("file transfer gating", () => {
   });
 
   // Regression guard for the JSON body limit: over HTTP the SDK's default 100 kB
-  // body-parser limit would 413 an upload well below WINBRIDGE_MAX_FILE_BYTES.
+  // body-parser limit would 413 an upload well below WINREACH_MAX_FILE_BYTES.
   it("uploads and downloads a file larger than 100 kB over HTTP", async () => {
-    const root = mkdtempSync(join(tmpdir(), "winbridge-http-ft-"));
+    const root = mkdtempSync(join(tmpdir(), "winreach-http-ft-"));
     cleanups.push(() => rmSync(root, { recursive: true, force: true }));
     // 300 kB payload with the cap set exactly at its size: this exercises the
     // body-limit envelope slack (a file AT the cap must pass the JSON parser)
@@ -444,7 +444,7 @@ describe("file transfer gating", () => {
     const payload = Buffer.alloc(300 * 1024, 7); // ~400 kB base64
     const config = makeConfig({ fileTransfer: { enabled: true, root, maxBytes: payload.length } });
 
-    const { app } = createWinBridgeApp(config);
+    const { app } = createWinReachApp(config);
     const { server } = createServerForApp(app, undefined);
     const port = await listen(server);
 
@@ -478,7 +478,7 @@ describe("per-principal tool allowlist", () => {
   async function listToolNames(config: AppConfig, principal: Principal): Promise<string[]> {
     const sessions = new PowerShellSessionManager(config);
     const audit = createAuditLogger(undefined);
-    const server = createWinBridgeMcpServer(config, sessions, principal, audit);
+    const server = createWinReachMcpServer(config, sessions, principal, audit);
     const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
     const client = new Client({ name: "test-client", version: "0.0.0" });
     await Promise.all([client.connect(clientTransport), server.connect(serverTransport)]);

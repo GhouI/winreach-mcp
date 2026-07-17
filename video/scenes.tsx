@@ -279,7 +279,7 @@ export const SceneSolution: React.FC = () => {
           lineHeight: 1.1,
         }}
       >
-        WinBridge makes Windows an{" "}
+        WinReach makes Windows an{" "}
         <span style={{ color: theme.teal }}>MCP-native</span> target.
       </h1>
 
@@ -302,7 +302,7 @@ export const SceneSolution: React.FC = () => {
         <PipeNode
           frame={frame}
           appear={62}
-          title="WinBridge"
+          title="WinReach"
           sub="MCP server · PowerShell tools"
           color={theme.teal}
           emphasize
@@ -331,9 +331,9 @@ type TLine =
 const TUNNEL = "https://swift-river-7s3d.trycloudflare.com/mcp";
 
 const heroLines: TLine[] = [
-  { kind: "cmd", text: "$env:WINBRIDGE_TUNNEL = 'cloudflare'", start: 18 },
+  { kind: "cmd", text: "$env:WINREACH_TUNNEL = 'cloudflare'", start: 18 },
   { kind: "cmd", text: "npm run dev", start: 62 },
-  { kind: "out", text: "WinBridge MCP listening on http://127.0.0.1:7573/mcp", at: 90 },
+  { kind: "out", text: "WinReach MCP listening on http://127.0.0.1:7573/mcp", at: 90 },
   { kind: "out", text: "Cloudflare tunnel ready:", at: 108 },
   { kind: "out", text: TUNNEL, at: 120, color: theme.green },
 ];
@@ -438,7 +438,7 @@ export const SceneCommand: React.FC = () => {
           <span style={{ width: 13, height: 13, borderRadius: 13, background: theme.amber }} />
           <span style={{ width: 13, height: 13, borderRadius: 13, background: theme.green }} />
           <span style={{ color: theme.inkFaint, fontSize: 15, marginLeft: 10 }}>
-            Windows PowerShell — winbridge
+            Windows PowerShell — winreach
           </span>
         </div>
         <div

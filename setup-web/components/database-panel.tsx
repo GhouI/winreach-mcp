@@ -2,7 +2,7 @@
 
 // Dashboard panel for the account-store backend. Pick a backend, Test the
 // connection, then Set up (create/validate the schema). Guarded by
-// WINBRIDGE_SETUP_KEY (same bearer scheme as the agent config API).
+// WINREACH_SETUP_KEY (same bearer scheme as the agent config API).
 
 import { useState } from "react";
 import { Field, Grid, Section, StatusMsg, TextInput, Warn, btnPrimary, btnSecondary } from "@/components/ui";
@@ -34,7 +34,7 @@ export function DatabasePanel({
 }) {
   const [setupKey, setSetupKey] = useState("");
   const [kind, setKind] = useState<StoreKind>("sqlite");
-  const [file, setFile] = useState("data/winbridge.sqlite");
+  const [file, setFile] = useState("data/winreach.sqlite");
   const [url, setUrl] = useState("");
   const [database, setDatabase] = useState("");
 
@@ -44,7 +44,7 @@ export function DatabasePanel({
 
   const buildConfig = () =>
     kind === "sqlite"
-      ? { kind, file: file.trim() || "data/winbridge.sqlite" }
+      ? { kind, file: file.trim() || "data/winreach.sqlite" }
       : kind === "mongodb"
         ? { kind, url: url.trim(), database: database.trim() || undefined }
         : { kind, url: url.trim() };
@@ -124,7 +124,7 @@ export function DatabasePanel({
     <div className="space-y-5">
       <Section
         title="Backend"
-        desc="Where WinBridge stores admin logins and account keys. The app creates tables if missing and validates an existing schema — it never drops or alters your data. See docs/database.md for the canonical schema."
+        desc="Where WinReach stores admin logins and account keys. The app creates tables if missing and validates an existing schema — it never drops or alters your data. See docs/database.md for the canonical schema."
       >
         <Field label="Engine" asDiv>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -157,13 +157,13 @@ export function DatabasePanel({
 
         {kind === "sqlite" ? (
           <Field label="SQLite file path" hint="Relative to the app, or an absolute path.">
-            <TextInput value={file} onChange={setFile} placeholder="data/winbridge.sqlite" mono />
+            <TextInput value={file} onChange={setFile} placeholder="data/winreach.sqlite" mono />
           </Field>
         ) : (
           <Grid>
             <Field
               label="Connection URL"
-              hint="Include credentials + TLS params. Encrypted at rest with WINBRIDGE_DB_KEY."
+              hint="Include credentials + TLS params. Encrypted at rest with WINREACH_DB_KEY."
             >
               <TextInput
                 value={url}
@@ -180,7 +180,7 @@ export function DatabasePanel({
             </Field>
             {kind === "mongodb" && (
               <Field label="Database name" hint="Optional if included in the URL.">
-                <TextInput value={database} onChange={setDatabase} placeholder="winbridge" mono />
+                <TextInput value={database} onChange={setDatabase} placeholder="winreach" mono />
               </Field>
             )}
           </Grid>
@@ -188,7 +188,7 @@ export function DatabasePanel({
 
         {needsKey && (
           <Warn>
-            Non-SQLite backends require <code className="font-mono">WINBRIDGE_DB_KEY</code> to be
+            Non-SQLite backends require <code className="font-mono">WINREACH_DB_KEY</code> to be
             set on this host so the connection string is encrypted at rest. Set it before running
             Set up.
           </Warn>
@@ -200,10 +200,10 @@ export function DatabasePanel({
         desc="Test connects and reports schema status. Set up creates/validates it and saves the config."
       >
         <p className="max-w-prose text-xs leading-relaxed text-muted">
-          These actions require the <code className="font-mono">WINBRIDGE_SETUP_KEY</code> set on
+          These actions require the <code className="font-mono">WINREACH_SETUP_KEY</code> set on
           this host (the same key the agent config API uses).
         </p>
-        <Field label="Setup key" hint="Must match WINBRIDGE_SETUP_KEY on this host.">
+        <Field label="Setup key" hint="Must match WINREACH_SETUP_KEY on this host.">
           <TextInput value={setupKey} onChange={setSetupKey} placeholder="paste your setup key" mono />
         </Field>
         <div className="flex flex-wrap items-center gap-2">

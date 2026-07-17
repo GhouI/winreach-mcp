@@ -1,20 +1,20 @@
 #requires -Version 5.1
 <#
 .SYNOPSIS
-    Stop and remove the WinBridge MCP Windows service.
+    Stop and remove the WinReach MCP Windows service.
 .DESCRIPTION
-    Stops and removes the NSSM-managed WinBridge service created by
+    Stops and removes the NSSM-managed WinReach service created by
     install-service.ps1. Run from an elevated (Administrator) PowerShell.
 .PARAMETER ServiceName
-    Windows service name. Default: WinBridgeMCP.
+    Windows service name. Default: WinReachMCP.
 .PARAMETER NssmPath
-    Explicit path to nssm.exe. Default: PATH, then ~/.winbridge/bin/nssm.exe.
+    Explicit path to nssm.exe. Default: PATH, then ~/.winreach/bin/nssm.exe.
 .EXAMPLE
     ./scripts/uninstall-service.ps1
 #>
 [CmdletBinding()]
 param(
-    [string]$ServiceName = "WinBridgeMCP",
+    [string]$ServiceName = "WinReachMCP",
     [string]$NssmPath
 )
 
@@ -34,9 +34,9 @@ function Resolve-Nssm {
     }
     $cmd = Get-Command nssm -ErrorAction SilentlyContinue
     if ($cmd) { return $cmd.Source }
-    $cached = Join-Path $HOME ".winbridge\bin\nssm.exe"
+    $cached = Join-Path $HOME ".winreach\bin\nssm.exe"
     if (Test-Path $cached) { return $cached }
-    throw "nssm.exe not found on PATH or in ~/.winbridge/bin. Pass -NssmPath."
+    throw "nssm.exe not found on PATH or in ~/.winreach/bin. Pass -NssmPath."
 }
 
 if (-not (Test-Admin)) {

@@ -1,12 +1,12 @@
 // Apply endpoint — takes the generated setup config and writes it into effect
 // on THIS host. It does three things, all under a server-chosen data dir:
 //
-//   1. writes  data/winbridge.env         (dotenv WINBRIDGE_* the host can load)
-//   2. writes  data/start-winbridge.ps1   (a ready-to-run PowerShell start script)
-//   3. persists the config via the shared config store (data/winbridge-setup.config.json)
+//   1. writes  data/winreach.env         (dotenv WINREACH_* the host can load)
+//   2. writes  data/start-winreach.ps1   (a ready-to-run PowerShell start script)
+//   3. persists the config via the shared config store (data/winreach-setup.config.json)
 //
-// Auth: Authorization: Bearer <WINBRIDGE_SETUP_KEY> (or x-setup-key header) — the
-// endpoint is DISABLED until WINBRIDGE_SETUP_KEY is set on the host, so nothing is
+// Auth: Authorization: Bearer <WINREACH_SETUP_KEY> (or x-setup-key header) — the
+// endpoint is DISABLED until WINREACH_SETUP_KEY is set on the host, so nothing is
 // exposed by default. Same-origin + body-cap + rate-limit guards apply.
 
 import { promises as fs } from "node:fs";
@@ -16,7 +16,7 @@ import { authorizeSetupKey } from "@/lib/setup-key";
 import { clientKey, crossOriginError, rateLimit, rateLimited, readJsonCapped } from "@/lib/http-guard";
 import { sanitizeConfig } from "@/lib/form-state";
 import { writeStoredConfig } from "@/lib/config-store";
-import { buildEnvFile, buildEnvVars, buildStartScript } from "@/lib/winbridge-config";
+import { buildEnvFile, buildEnvVars, buildStartScript } from "@/lib/winreach-config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -43,9 +43,9 @@ export async function POST(req: NextRequest) {
   // The data dir is chosen by the SERVER, never supplied by the client, so a
   // request can't be tricked into writing outside the app's own data folder.
   const dataDir = path.join(process.cwd(), "data");
-  const envPath = path.join(dataDir, "winbridge.env");
-  const scriptPath = path.join(dataDir, "start-winbridge.ps1");
-  const configPath = path.join(dataDir, "winbridge-setup.config.json");
+  const envPath = path.join(dataDir, "winreach.env");
+  const scriptPath = path.join(dataDir, "start-winreach.ps1");
+  const configPath = path.join(dataDir, "winreach-setup.config.json");
 
   const envFile = buildEnvFile(config);
   const startScript = buildStartScript(config);

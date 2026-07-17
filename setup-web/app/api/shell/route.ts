@@ -36,7 +36,7 @@ type ShellResult = {
 
 function shellFor(platform: NodeJS.Platform): { file: string; args: (cmd: string) => string[]; label: string } {
   if (platform === "win32") {
-    // PowerShell is WinBridge's native shell; ComSpec (cmd.exe) is the fallback.
+    // PowerShell is WinReach's native shell; ComSpec (cmd.exe) is the fallback.
     return {
       file: "powershell.exe",
       args: (cmd) => ["-NoProfile", "-NonInteractive", "-Command", cmd],

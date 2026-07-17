@@ -33,9 +33,9 @@ type Db = {
 };
 type MongoClientT = { connect(): Promise<void>; db(name?: string): Db; close(): Promise<void> };
 
-const ADMINS = "winbridge_admins";
-const USERS = "winbridge_users";
-const META = "winbridge_meta";
+const ADMINS = "winreach_admins";
+const USERS = "winreach_users";
+const META = "winreach_meta";
 
 /** Required snake_case field -> camelCase document key. */
 const camelOf = (f: string): string => snakeToCamel(f);

@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-# WinBridge MCP server image.
+# WinReach MCP server image.
 #
 # The server targets Windows + powershell.exe, but resolveShellPath() falls back
 # to `pwsh` off-Windows, so a Linux container runs against PowerShell 7. Screen
@@ -39,12 +39,12 @@ RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=build /app/dist ./dist
 
 # The server falls back to `pwsh` off-Windows; make it explicit.
-ENV WINBRIDGE_SHELL_PATH=pwsh \
-    WINBRIDGE_HOST=0.0.0.0 \
-    WINBRIDGE_PORT=7573 \
+ENV WINREACH_SHELL_PATH=pwsh \
+    WINREACH_HOST=0.0.0.0 \
+    WINREACH_PORT=7573 \
     NODE_ENV=production
 
 EXPOSE 7573
 
-# WINBRIDGE_TOKEN (or WINBRIDGE_PRINCIPALS) must be supplied at run time.
+# WINREACH_TOKEN (or WINREACH_PRINCIPALS) must be supplied at run time.
 CMD ["node", "dist/src/server.js"]

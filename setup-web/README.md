@@ -1,11 +1,11 @@
-# WinBridge Setup Web
+# WinReach Setup Web
 
 A small [Next.js](https://nextjs.org) app that helps you configure a
-[WinBridge MCP](../README.md) server. Walk through the setup stages
+[WinReach MCP](../README.md) server. Walk through the setup stages
 (Server → Access → Security → Tools → Policy → Review) and it generates, live
 in your browser:
 
-- the `WINBRIDGE_*` **environment variables** and a **`start.ps1`** script,
+- the `WINREACH_*` **environment variables** and a **`start.ps1`** script,
 - a **Windows firewall rule** (`New-NetFirewallRule`) scoped to your allowed
   source IPs / corporate CIDRs,
 - **agent-connect snippets** for Claude Code and Codex.
@@ -21,20 +21,20 @@ the output, review it, and apply it on your host.
 
 The Review stage can save the configuration on the host running this app so
 agents can read and modify it over HTTP. The endpoint is **disabled by
-default** — set `WINBRIDGE_SETUP_KEY` before starting the app to enable it:
+default** — set `WINREACH_SETUP_KEY` before starting the app to enable it:
 
 ```
 GET  /api/config    # read the saved config
 PUT  /api/config    # replace it (JSON body: { "config": { ... } })
-Authorization: Bearer <WINBRIDGE_SETUP_KEY>
+Authorization: Bearer <WINREACH_SETUP_KEY>
 ```
 
-Saved documents live in `data/winbridge-setup.config.json` and record when and
+Saved documents live in `data/winreach-setup.config.json` and record when and
 by whom (`web` or `agent`) they were last updated. Unknown fields are dropped
 and missing ones fall back to defaults. The API only stores the setup
-document — it never starts or reconfigures a running WinBridge server.
+document — it never starts or reconfigures a running WinReach server.
 
-> Note: source-IP filtering is produced as a **firewall rule** — WinBridge does
+> Note: source-IP filtering is produced as a **firewall rule** — WinReach does
 > not yet filter source IPs in-app. See the repo roadmap.
 
 ## Run it
@@ -59,7 +59,7 @@ npm start
 - `components/` — presentational pieces: `ui.tsx` (sections, fields, toggles,
   warnings), `stepper.tsx` (stage navigation), `output-panel.tsx` (tabbed code
   viewer), `icons.tsx` (inline SVG icons).
-- `lib/winbridge-config.ts` — pure functions that turn the form state into env
+- `lib/winreach-config.ts` — pure functions that turn the form state into env
   vars, firewall rules, and agent snippets (no React/DOM, easy to test).
 - `lib/form-state.ts` — form-state ↔ config mapping + JSON sanitizing.
 - `lib/config-store.ts` — server-side persistence for the agent API.

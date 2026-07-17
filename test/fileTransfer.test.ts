@@ -18,7 +18,7 @@ afterEach(() => {
 });
 
 function makeRoot(): string {
-  const dir = mkdtempSync(join(tmpdir(), "winbridge-files-"));
+  const dir = mkdtempSync(join(tmpdir(), "winreach-files-"));
   roots.push(dir);
   return dir;
 }

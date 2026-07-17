@@ -93,8 +93,8 @@ export class PostgresStore implements AccountStore {
     let created = false;
     const missing: string[] = [];
 
-    if (!(await this.tableExists(c, "winbridge_admins"))) {
-      await c.query(`CREATE TABLE IF NOT EXISTS winbridge_admins (
+    if (!(await this.tableExists(c, "winreach_admins"))) {
+      await c.query(`CREATE TABLE IF NOT EXISTS winreach_admins (
         id TEXT PRIMARY KEY,
         username TEXT UNIQUE NOT NULL,
         password_hash TEXT NOT NULL,
@@ -102,11 +102,11 @@ export class PostgresStore implements AccountStore {
       )`);
       created = true;
     } else {
-      missing.push(...missingFields(await this.columns(c, "winbridge_admins"), REQUIRED_ADMIN_FIELDS));
+      missing.push(...missingFields(await this.columns(c, "winreach_admins"), REQUIRED_ADMIN_FIELDS));
     }
 
-    if (!(await this.tableExists(c, "winbridge_users"))) {
-      await c.query(`CREATE TABLE IF NOT EXISTS winbridge_users (
+    if (!(await this.tableExists(c, "winreach_users"))) {
+      await c.query(`CREATE TABLE IF NOT EXISTS winreach_users (
         id TEXT PRIMARY KEY,
         name TEXT UNIQUE NOT NULL,
         role TEXT NOT NULL,
@@ -121,15 +121,15 @@ export class PostgresStore implements AccountStore {
       )`);
       created = true;
     } else {
-      missing.push(...missingFields(await this.columns(c, "winbridge_users"), REQUIRED_USER_FIELDS));
+      missing.push(...missingFields(await this.columns(c, "winreach_users"), REQUIRED_USER_FIELDS));
     }
 
-    await c.query(`CREATE TABLE IF NOT EXISTS winbridge_meta (
+    await c.query(`CREATE TABLE IF NOT EXISTS winreach_meta (
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
     )`);
     await c.query(
-      "INSERT INTO winbridge_meta (key, value) VALUES ('schema_version', $1) " +
+      "INSERT INTO winreach_meta (key, value) VALUES ('schema_version', $1) " +
         "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
       [String(SCHEMA_VERSION)],
     );
@@ -149,7 +149,7 @@ export class PostgresStore implements AccountStore {
 
   private async readVersion(c: PgClient): Promise<number | undefined> {
     try {
-      const res = await c.query("SELECT value FROM winbridge_meta WHERE key = 'schema_version'");
+      const res = await c.query("SELECT value FROM winreach_meta WHERE key = 'schema_version'");
       return res.rows[0] ? Number(res.rows[0].value) : undefined;
     } catch {
       return undefined;
@@ -159,12 +159,12 @@ export class PostgresStore implements AccountStore {
   async status(): Promise<StoreStatus> {
     const c = await this.connect();
     const missing: string[] = [];
-    const adminsExist = await this.tableExists(c, "winbridge_admins");
-    const usersExist = await this.tableExists(c, "winbridge_users");
-    if (!adminsExist) missing.push("winbridge_admins");
-    else missing.push(...missingFields(await this.columns(c, "winbridge_admins"), REQUIRED_ADMIN_FIELDS));
-    if (!usersExist) missing.push("winbridge_users");
-    else missing.push(...missingFields(await this.columns(c, "winbridge_users"), REQUIRED_USER_FIELDS));
+    const adminsExist = await this.tableExists(c, "winreach_admins");
+    const usersExist = await this.tableExists(c, "winreach_users");
+    if (!adminsExist) missing.push("winreach_admins");
+    else missing.push(...missingFields(await this.columns(c, "winreach_admins"), REQUIRED_ADMIN_FIELDS));
+    if (!usersExist) missing.push("winreach_users");
+    else missing.push(...missingFields(await this.columns(c, "winreach_users"), REQUIRED_USER_FIELDS));
     const schemaReady = adminsExist && usersExist && missing.length === 0;
     return {
       connected: true,
@@ -185,7 +185,7 @@ export class PostgresStore implements AccountStore {
 
   async countAdmins(): Promise<number> {
     const c = await this.connect();
-    const res = await c.query("SELECT COUNT(*)::int AS n FROM winbridge_admins");
+    const res = await c.query("SELECT COUNT(*)::int AS n FROM winreach_admins");
     return Number(res.rows[0].n);
   }
 
@@ -193,7 +193,7 @@ export class PostgresStore implements AccountStore {
     const c = await this.connect();
     const admin: AdminAccount = { id: newId(), username, passwordHash, createdAt: nowIso() };
     await c.query(
-      "INSERT INTO winbridge_admins (id, username, password_hash, created_at) VALUES ($1, $2, $3, $4)",
+      "INSERT INTO winreach_admins (id, username, password_hash, created_at) VALUES ($1, $2, $3, $4)",
       [admin.id, admin.username, admin.passwordHash, admin.createdAt],
     );
     return admin;
@@ -201,31 +201,31 @@ export class PostgresStore implements AccountStore {
 
   async getAdminByUsername(username: string): Promise<AdminAccount | null> {
     const c = await this.connect();
-    const res = await c.query("SELECT * FROM winbridge_admins WHERE username = $1", [username]);
+    const res = await c.query("SELECT * FROM winreach_admins WHERE username = $1", [username]);
     return res.rows[0] ? mapAdmin(res.rows[0]) : null;
   }
 
   async getAdminById(id: string): Promise<AdminAccount | null> {
     const c = await this.connect();
-    const res = await c.query("SELECT * FROM winbridge_admins WHERE id = $1", [id]);
+    const res = await c.query("SELECT * FROM winreach_admins WHERE id = $1", [id]);
     return res.rows[0] ? mapAdmin(res.rows[0]) : null;
   }
 
   async listUsers(): Promise<AccountUser[]> {
     const c = await this.connect();
-    const res = await c.query("SELECT * FROM winbridge_users ORDER BY created_at ASC");
+    const res = await c.query("SELECT * FROM winreach_users ORDER BY created_at ASC");
     return res.rows.map(mapUser);
   }
 
   async getUserById(id: string): Promise<AccountUser | null> {
     const c = await this.connect();
-    const res = await c.query("SELECT * FROM winbridge_users WHERE id = $1", [id]);
+    const res = await c.query("SELECT * FROM winreach_users WHERE id = $1", [id]);
     return res.rows[0] ? mapUser(res.rows[0]) : null;
   }
 
   async getUserByTokenHash(tokenHash: string): Promise<AccountUser | null> {
     const c = await this.connect();
-    const res = await c.query("SELECT * FROM winbridge_users WHERE token_hash = $1", [tokenHash]);
+    const res = await c.query("SELECT * FROM winreach_users WHERE token_hash = $1", [tokenHash]);
     return res.rows[0] ? mapUser(res.rows[0]) : null;
   }
 
@@ -245,7 +245,7 @@ export class PostgresStore implements AccountStore {
       lastUsedAt: null,
     };
     await c.query(
-      `INSERT INTO winbridge_users
+      `INSERT INTO winreach_users
         (id, name, role, token_hash, token_enc, tools, allow, deny, enabled, created_at, last_used_at)
         VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb, $9, $10, $11)`,
       [
@@ -279,19 +279,19 @@ export class PostgresStore implements AccountStore {
     }
     if (sets.length > 0) {
       values.push(id);
-      await c.query(`UPDATE winbridge_users SET ${sets.join(", ")} WHERE id = $${i}`, values);
+      await c.query(`UPDATE winreach_users SET ${sets.join(", ")} WHERE id = $${i}`, values);
     }
     return this.getUserById(id);
   }
 
   async deleteUser(id: string): Promise<boolean> {
     const c = await this.connect();
-    const res = await c.query("DELETE FROM winbridge_users WHERE id = $1", [id]);
+    const res = await c.query("DELETE FROM winreach_users WHERE id = $1", [id]);
     return (res.rowCount ?? 0) > 0;
   }
 
   async touchUser(id: string, whenIso: string): Promise<void> {
     const c = await this.connect();
-    await c.query("UPDATE winbridge_users SET last_used_at = $1 WHERE id = $2", [whenIso, id]);
+    await c.query("UPDATE winreach_users SET last_used_at = $1 WHERE id = $2", [whenIso, id]);
   }
 }

@@ -20,7 +20,7 @@ import {
   buildPowerShellEnv,
   buildPrincipalsJson,
   buildStartScript,
-} from "@/lib/winbridge-config";
+} from "@/lib/winreach-config";
 import {
   INITIAL,
   fromConfig,
@@ -34,8 +34,8 @@ import { Dashboard } from "@/components/dashboard";
 import { ConsoleButton, ConsoleModal } from "@/components/console-modal";
 import type { Boot } from "@/components/accounts-panel";
 
-const CONFIG_KEY = "winbridge.setup.v1";
-const ONBOARD_KEY = "winbridge.onboarded.v1";
+const CONFIG_KEY = "winreach.setup.v1";
+const ONBOARD_KEY = "winreach.onboarded.v1";
 
 type Phase = "loading" | "onboarding" | "dashboard";
 
@@ -137,7 +137,7 @@ export default function Home() {
         <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between px-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-2.5">
             <span aria-hidden className="size-2.5 shrink-0 bg-accent" />
-            <span className="truncate text-sm font-semibold tracking-tight">WinBridge</span>
+            <span className="truncate text-sm font-semibold tracking-tight">WinReach</span>
             <span className="text-sm text-faint">MCP</span>
           </div>
           {phase === "dashboard" && <ConsoleButton onOpen={() => setConsoleOpen(true)} />}
@@ -166,7 +166,7 @@ export default function Home() {
       {/* ---- Footer ---- */}
       <footer className="border-t border-border">
         <div className="mx-auto w-full max-w-6xl px-4 py-6 text-xs leading-relaxed text-muted sm:px-6">
-          <p>Nothing is applied automatically — review the generated config and run WinBridge on your host.</p>
+          <p>Nothing is applied automatically — review the generated config and run WinReach on your host.</p>
         </div>
       </footer>
 

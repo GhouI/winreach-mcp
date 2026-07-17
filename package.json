@@ -1,5 +1,5 @@
 {
-  "name": "winbridge-mcp",
+  "name": "winreach-mcp",
   "version": "0.2.0",
   "type": "module",
   "description": "Remote MCP bridge that gives AI agents secure headless PowerShell access to Windows hosts, with one-command public Cloudflare tunnels.",
@@ -18,19 +18,19 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/GhouI/winbridge-mcp.git"
+    "url": "git+https://github.com/GhouI/winreach-mcp.git"
   },
   "bugs": {
-    "url": "https://github.com/GhouI/winbridge-mcp/issues"
+    "url": "https://github.com/GhouI/winreach-mcp/issues"
   },
-  "homepage": "https://github.com/GhouI/winbridge-mcp#readme",
+  "homepage": "https://github.com/GhouI/winreach-mcp#readme",
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "start": "node dist/src/server.js",
     "dev": "tsx src/server.ts",
     "client": "tsx src/client.ts",
-    "video:render": "remotion render video/index.ts WinBridgeDemo assets/winbridge-demo.mp4",
-    "video:still": "remotion still video/index.ts WinBridgeDemo assets/winbridge-demo.png --frame=510",
+    "video:render": "remotion render video/index.ts WinReachDemo assets/winreach-demo.mp4",
+    "video:still": "remotion still video/index.ts WinReachDemo assets/winreach-demo.png --frame=510",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.json --noEmit",

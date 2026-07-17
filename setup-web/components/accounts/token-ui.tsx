@@ -46,7 +46,7 @@ export function TokenBanner({ name, token, onDismiss }: { name: string; token: s
   );
 }
 
-/** Read-only, copyable code block used for the WINBRIDGE_PRINCIPALS export. */
+/** Read-only, copyable code block used for the WINREACH_PRINCIPALS export. */
 export function CodeBlock({ label, text }: { label: string; text: string }) {
   const [copied, setCopied] = useState(false);
   const copy = async () => {

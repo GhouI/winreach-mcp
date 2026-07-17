@@ -1,4 +1,4 @@
-# WinBridge accounts — database & schema
+# WinReach accounts — database & schema
 
 The setup app can persist **admin logins** and **user accounts (agent keys)** in a
 database so they can be managed at runtime. During onboarding you choose one of:
@@ -23,17 +23,17 @@ extra columns/fields you add — so you can extend the schema for your own needs
 | --- | --- | --- |
 | Admin password | **scrypt** hash (salted, slow) | login; never reversible |
 | Agent token (key) | **SHA‑256** hash (`token_hash`) | authentication + lookup; tokens are 256‑bit random, so a fast hash is safe |
-| Agent token (copy) | **AES‑256‑GCM** ciphertext (`token_enc`) or null | optional, so an operator can re‑reveal a key; decryptable only with `WINBRIDGE_DB_KEY` |
+| Agent token (copy) | **AES‑256‑GCM** ciphertext (`token_enc`) or null | optional, so an operator can re‑reveal a key; decryptable only with `WINREACH_DB_KEY` |
 | Everything | TLS in transit | end‑to‑end transport encryption |
 
 - A bearer token is **never stored in plaintext.** It is shown to the operator
   **once** at creation; after that only its SHA‑256 hash (and an optional
   AES‑GCM‑encrypted copy) is kept.
-- Set **`WINBRIDGE_DB_KEY`** (a long random secret) to enable the encrypted copy.
+- Set **`WINREACH_DB_KEY`** (a long random secret) to enable the encrypted copy.
   Losing it means encrypted copies can't be decrypted (hashes still authenticate).
-- WinBridge authenticates an agent by hashing the presented bearer token and
+- WinReach authenticates an agent by hashing the presented bearer token and
   comparing it to `token_hash` (constant‑time). The generated
-  `WINBRIDGE_PRINCIPALS` carries `tokenHash`, not the plaintext key.
+  `WINREACH_PRINCIPALS` carries `tokenHash`, not the plaintext key.
 
 ## Canonical schema (SQL)
 
@@ -42,13 +42,13 @@ columns hold arrays. `tools` is `NULL` to mean *all tools*, or a JSON array to
 restrict. Booleans may be a native boolean or `0/1` per engine.
 
 ```
-winbridge_admins
+winreach_admins
   id            text  primary key
   username      text  unique not null
   password_hash text  not null
   created_at    text/timestamp not null
 
-winbridge_users
+winreach_users
   id            text  primary key
   name          text  unique not null
   role          text  not null
@@ -61,7 +61,7 @@ winbridge_users
   created_at    text/timestamp not null
   last_used_at  text/timestamp null
 
-winbridge_meta
+winreach_meta
   key           text primary key          -- e.g. "schema_version"
   value         text not null
 ```
@@ -75,16 +75,16 @@ Two collections, documents mirroring the fields above (camelCase or snake — th
 adapter maps them). Required indexes:
 
 ```
-db.winbridge_admins.createIndex({ username: 1 }, { unique: true })
-db.winbridge_users.createIndex({ name: 1 }, { unique: true })
-db.winbridge_users.createIndex({ tokenHash: 1 }, { unique: true })
+db.winreach_admins.createIndex({ username: 1 }, { unique: true })
+db.winreach_users.createIndex({ name: 1 }, { unique: true })
+db.winreach_users.createIndex({ tokenHash: 1 }, { unique: true })
 ```
 
-A `winbridge_meta` collection holds `{ key, value }` docs (e.g. schema version).
+A `winreach_meta` collection holds `{ key, value }` docs (e.g. schema version).
 
 ## Using an existing table
 
-If the target already has a `winbridge_users` / `winbridge_admins` table (or the
+If the target already has a `winreach_users` / `winreach_admins` table (or the
 Mongo collections), the app validates that the **required** columns/fields are
 present (see `REQUIRED_USER_FIELDS` / `REQUIRED_ADMIN_FIELDS` in
 `lib/store/types.ts`). If any are missing it refuses to run and tells you which,
@@ -106,7 +106,7 @@ The schema is intentionally flexible. Follow these rules so changes stay safe:
 4. **Parameterized queries only.** Every backend must bind user input as
    parameters — never string‑concatenate SQL, and never build Mongo queries from
    raw user objects.
-5. **Record the version.** Write `schema_version` into `winbridge_meta` on init
+5. **Record the version.** Write `schema_version` into `winreach_meta` on init
    and read it back to detect drift.
 
 ### Adding a new database backend

@@ -1,13 +1,13 @@
 #requires -Version 5.1
 <#
 .SYNOPSIS
-    Install WinBridge MCP as a Windows service that starts on boot.
+    Install WinReach MCP as a Windows service that starts on boot.
 .DESCRIPTION
     Registers `node dist/server.js` as a Windows service using NSSM (the
     Non-Sucking Service Manager), the standard way to run an arbitrary process
     under the Windows Service Control Manager. NSSM is located on PATH, at an
     explicit -NssmPath, or downloaded automatically from nssm.cc into
-    ~/.winbridge/bin (mirroring how WinBridge fetches cloudflared).
+    ~/.winreach/bin (mirroring how WinReach fetches cloudflared).
 
     Security-relevant behaviour:
       * -ServiceAccount + -ServiceAccountPassword run the service as a dedicated,
@@ -21,14 +21,14 @@
 
     Run this script from an elevated (Administrator) PowerShell.
 .PARAMETER ServiceName
-    Windows service name. Default: WinBridgeMCP.
+    Windows service name. Default: WinReachMCP.
 .PARAMETER ProjectDir
-    WinBridge project directory. Default: the repo root (parent of this script).
+    WinReach project directory. Default: the repo root (parent of this script).
 .PARAMETER EnvFile
     Path to a KEY=VALUE env file (e.g. .env) whose entries become the service's
-    environment (WINBRIDGE_TOKEN, WINBRIDGE_TLS_CERT, WINBRIDGE_AUDIT_LOG, ...).
+    environment (WINREACH_TOKEN, WINREACH_TLS_CERT, WINREACH_AUDIT_LOG, ...).
 .PARAMETER ServiceAccount
-    Windows account to run the service as, e.g. ".\winbridge" or "DOMAIN\svc".
+    Windows account to run the service as, e.g. ".\winreach" or "DOMAIN\svc".
     Omit to run as LocalSystem (not recommended for production).
 .PARAMETER ServiceAccountPassword
     SecureString password for -ServiceAccount.
@@ -38,11 +38,11 @@
     Explicit path to nssm.exe. Default: PATH, then auto-download.
 .EXAMPLE
     $pw = Read-Host -AsSecureString "Service account password"
-    ./scripts/install-service.ps1 -EnvFile .env -ServiceAccount ".\winbridge" -ServiceAccountPassword $pw
+    ./scripts/install-service.ps1 -EnvFile .env -ServiceAccount ".\winreach" -ServiceAccountPassword $pw
 #>
 [CmdletBinding()]
 param(
-    [string]$ServiceName = "WinBridgeMCP",
+    [string]$ServiceName = "WinReachMCP",
     [string]$ProjectDir = (Split-Path -Parent $PSScriptRoot),
     [string]$EnvFile,
     [string]$ServiceAccount,
@@ -79,7 +79,7 @@ function Resolve-Nssm {
     $cmd = Get-Command nssm -ErrorAction SilentlyContinue
     if ($cmd) { return $cmd.Source }
 
-    $binDir = Join-Path $HOME ".winbridge\bin"
+    $binDir = Join-Path $HOME ".winreach\bin"
     $cached = Join-Path $binDir "nssm.exe"
     if (Test-Path $cached) { return $cached }
 
@@ -130,9 +130,9 @@ $node = Resolve-Node -Explicit $NodePath
 $nssm = Resolve-Nssm -Explicit $NssmPath
 $envPairs = Read-EnvFile -Path $EnvFile
 
-if (-not $envPairs.ContainsKey("WINBRIDGE_TOKEN") -and -not $envPairs.ContainsKey("WINBRIDGE_PRINCIPALS") `
-        -and -not $env:WINBRIDGE_TOKEN -and -not $env:WINBRIDGE_PRINCIPALS) {
-    Write-Warning "No WINBRIDGE_TOKEN/WINBRIDGE_PRINCIPALS found in -EnvFile or environment; the service will fail to start until one is set."
+if (-not $envPairs.ContainsKey("WINREACH_TOKEN") -and -not $envPairs.ContainsKey("WINREACH_PRINCIPALS") `
+        -and -not $env:WINREACH_TOKEN -and -not $env:WINREACH_PRINCIPALS) {
+    Write-Warning "No WINREACH_TOKEN/WINREACH_PRINCIPALS found in -EnvFile or environment; the service will fail to start until one is set."
 }
 
 # Remove any prior installation so re-running is idempotent.
@@ -145,8 +145,8 @@ if ($LASTEXITCODE -ne 0) { throw "nssm install failed with exit code $LASTEXITCO
 
 & $nssm set $ServiceName AppDirectory $ProjectDir | Out-Null
 & $nssm set $ServiceName Start SERVICE_AUTO_START | Out-Null
-& $nssm set $ServiceName AppStdout (Join-Path $ProjectDir "winbridge.out.log") | Out-Null
-& $nssm set $ServiceName AppStderr (Join-Path $ProjectDir "winbridge.err.log") | Out-Null
+& $nssm set $ServiceName AppStdout (Join-Path $ProjectDir "winreach.out.log") | Out-Null
+& $nssm set $ServiceName AppStderr (Join-Path $ProjectDir "winreach.err.log") | Out-Null
 & $nssm set $ServiceName AppRotateFiles 1 | Out-Null
 
 if ($envPairs.Count -gt 0) {
@@ -171,5 +171,5 @@ Write-Host "Starting service '$ServiceName' ..."
 & $nssm start $ServiceName
 if ($LASTEXITCODE -ne 0) { throw "nssm start failed with exit code $LASTEXITCODE" }
 
-Write-Host "WinBridge MCP is installed and running as service '$ServiceName'."
+Write-Host "WinReach MCP is installed and running as service '$ServiceName'."
 Write-Host "Manage it with: nssm restart/stop/status $ServiceName  (or Services.msc)"

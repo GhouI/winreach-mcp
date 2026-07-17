@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import type { Express } from "express";
 
 /**
- * TLS configuration. When present, WinBridge terminates HTTPS itself instead of
+ * TLS configuration. When present, WinReach terminates HTTPS itself instead of
  * relying on an external reverse proxy or tunnel for encryption. Supplying
  * `clientCaPath` additionally turns on mutual TLS: clients must present a
  * certificate signed by that CA or the connection is rejected during the
@@ -42,10 +42,10 @@ export function buildTlsOptions(tls: TlsConfig): {
   requestCert: boolean;
   rejectUnauthorized: boolean;
 } {
-  const cert = readPem(tls.certPath, "WINBRIDGE_TLS_CERT");
-  const key = readPem(tls.keyPath, "WINBRIDGE_TLS_KEY");
+  const cert = readPem(tls.certPath, "WINREACH_TLS_CERT");
+  const key = readPem(tls.keyPath, "WINREACH_TLS_KEY");
   const mtls = Boolean(tls.clientCaPath);
-  const ca = tls.clientCaPath ? readPem(tls.clientCaPath, "WINBRIDGE_TLS_CLIENT_CA") : undefined;
+  const ca = tls.clientCaPath ? readPem(tls.clientCaPath, "WINREACH_TLS_CLIENT_CA") : undefined;
 
   return {
     cert,

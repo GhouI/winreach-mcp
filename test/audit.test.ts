@@ -7,7 +7,7 @@ import { createAuditLogger, type AuditEntry } from "../src/audit.js";
 const tempDirs: string[] = [];
 
 function tempFile(name: string): string {
-  const dir = mkdtempSync(join(tmpdir(), "winbridge-audit-"));
+  const dir = mkdtempSync(join(tmpdir(), "winreach-audit-"));
   tempDirs.push(dir);
   return join(dir, name);
 }

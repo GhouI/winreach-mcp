@@ -1,10 +1,10 @@
 "use client";
 
-// Editor for reusable roles (WINBRIDGE_ROLES). A role is a named permission set
+// Editor for reusable roles (WINREACH_ROLES). A role is a named permission set
 // — a tool allowlist plus command allow/deny — that users inherit by name.
 // Controlled: all state lives in the wizard and flows in via `roles` / `onChange`.
 
-import { TOOL_NAMES } from "@/lib/winbridge-config";
+import { TOOL_NAMES } from "@/lib/winreach-config";
 import { newRole, type FormRole } from "@/lib/form-state";
 import { Field, TextArea, TextInput, Toggle, Warn } from "@/components/ui";
 
@@ -50,7 +50,7 @@ export function RolesEditor({
           <div key={r.id} className="rounded-md border border-border bg-background/60 p-4">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
-                <Field label="Role name" hint="Users reference this; becomes a WINBRIDGE_ROLES key.">
+                <Field label="Role name" hint="Users reference this; becomes a WINREACH_ROLES key.">
                   <TextInput value={r.name} onChange={(v) => update(r.id, { name: v })} placeholder="deployer" mono />
                 </Field>
               </div>

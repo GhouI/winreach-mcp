@@ -1,11 +1,11 @@
 // Agent-facing configuration endpoint.
 //
-//   GET  /api/config  -> the saved WinBridge setup config (JSON)
+//   GET  /api/config  -> the saved WinReach setup config (JSON)
 //   PUT  /api/config  -> replace the saved config (JSON body)
 //
-// Both require the setup key:  Authorization: Bearer <WINBRIDGE_SETUP_KEY>
+// Both require the setup key:  Authorization: Bearer <WINREACH_SETUP_KEY>
 // (or an `x-setup-key` header). The endpoint is DISABLED until the
-// WINBRIDGE_SETUP_KEY environment variable is set on the host running this
+// WINREACH_SETUP_KEY environment variable is set on the host running this
 // app, so nothing is exposed by default.
 
 import { timingSafeEqual } from "node:crypto";
@@ -24,12 +24,12 @@ function presentedKey(req: NextRequest): string {
 }
 
 function authorize(req: NextRequest): NextResponse | null {
-  const expected = process.env.WINBRIDGE_SETUP_KEY;
+  const expected = process.env.WINREACH_SETUP_KEY;
   if (!expected) {
     return NextResponse.json(
       {
         error:
-          "Agent API disabled: set WINBRIDGE_SETUP_KEY on the host running setup-web to enable it.",
+          "Agent API disabled: set WINREACH_SETUP_KEY on the host running setup-web to enable it.",
       },
       { status: 503 },
     );
@@ -40,7 +40,7 @@ function authorize(req: NextRequest): NextResponse | null {
   const ok = a.length === b.length && a.length > 0 && timingSafeEqual(a, b);
   if (!ok) {
     return NextResponse.json(
-      { error: "Unauthorized: send Authorization: Bearer <WINBRIDGE_SETUP_KEY>." },
+      { error: "Unauthorized: send Authorization: Bearer <WINREACH_SETUP_KEY>." },
       { status: 401 },
     );
   }

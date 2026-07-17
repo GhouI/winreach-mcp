@@ -1,8 +1,8 @@
 // Signed session cookies for admin login. Server-only (node:crypto).
 //
 // A session is a stateless, tamper-evident token: base64url(JSON payload) +
-// "." + HMAC-SHA256(payload) using a secret derived from WINBRIDGE_SESSION_SECRET
-// (preferred) or WINBRIDGE_DB_KEY. The cookie is httpOnly + SameSite=Lax and its
+// "." + HMAC-SHA256(payload) using a secret derived from WINREACH_SESSION_SECRET
+// (preferred) or WINREACH_DB_KEY. The cookie is httpOnly + SameSite=Lax and its
 // signature and expiry are re-verified on every protected request. No session
 // state is stored server-side; revocation is by expiry.
 
@@ -11,20 +11,20 @@ import { NextResponse, type NextRequest } from "next/server";
 import type { AccountStore, AdminAccount } from "@/lib/store/types";
 import { getStore } from "@/lib/store/db-config";
 
-export const SESSION_COOKIE = "winbridge_admin";
+export const SESSION_COOKIE = "winreach_admin";
 export const SESSION_MAX_AGE_SECONDS = 60 * 60 * 12; // 12 hours
 
 type SessionPayload = { aid: string; exp: number };
 
 const NO_SECRET =
-  "Admin login is disabled: set WINBRIDGE_SESSION_SECRET (or WINBRIDGE_DB_KEY) on the host to sign sessions.";
+  "Admin login is disabled: set WINREACH_SESSION_SECRET (or WINREACH_DB_KEY) on the host to sign sessions.";
 
 export function sessionSecretAvailable(): boolean {
-  return Boolean(process.env.WINBRIDGE_SESSION_SECRET || process.env.WINBRIDGE_DB_KEY);
+  return Boolean(process.env.WINREACH_SESSION_SECRET || process.env.WINREACH_DB_KEY);
 }
 
 function sessionSecret(): string {
-  const secret = process.env.WINBRIDGE_SESSION_SECRET || process.env.WINBRIDGE_DB_KEY;
+  const secret = process.env.WINREACH_SESSION_SECRET || process.env.WINREACH_DB_KEY;
   if (!secret) throw new Error(NO_SECRET);
   return secret;
 }
@@ -39,7 +39,7 @@ function b64url(buf: Buffer): string {
 let cachedSessionKey: Buffer | null = null;
 function sessionKey(): Buffer {
   if (!cachedSessionKey) {
-    cachedSessionKey = createHmac("sha256", sessionSecret()).update("winbridge-session-hmac-v1").digest();
+    cachedSessionKey = createHmac("sha256", sessionSecret()).update("winreach-session-hmac-v1").digest();
   }
   return cachedSessionKey;
 }

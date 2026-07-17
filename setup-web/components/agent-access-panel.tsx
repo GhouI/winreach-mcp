@@ -2,10 +2,10 @@
 
 // Dashboard panel for the /api/config host document: save the current
 // configuration to this host, or load the saved one back into the editor.
-// Gated by WINBRIDGE_SETUP_KEY (bearer), same as always.
+// Gated by WINREACH_SETUP_KEY (bearer), same as always.
 
 import { useState } from "react";
-import type { WinBridgeConfig } from "@/lib/winbridge-config";
+import type { WinReachConfig } from "@/lib/winreach-config";
 import { fromConfig, sanitizeConfig, type FormState } from "@/lib/form-state";
 import type { StoredConfig } from "@/lib/config-store";
 import { Field, Section, StatusMsg, TextInput, btnPrimary, btnSecondary } from "@/components/ui";
@@ -14,7 +14,7 @@ export function AgentAccessPanel({
   cfg,
   onLoaded,
 }: {
-  cfg: WinBridgeConfig;
+  cfg: WinReachConfig;
   onLoaded: (form: FormState) => void;
 }) {
   const [setupKey, setSetupKey] = useState("");
@@ -70,14 +70,14 @@ export function AgentAccessPanel({
       <div className="overflow-x-auto rounded-md border border-code-border bg-code p-3.5 font-mono text-xs leading-6 text-code-muted code-scroll">
         <p><span className="text-code-accent">GET</span>&nbsp;&nbsp;/api/config</p>
         <p><span className="text-code-accent">PUT</span>&nbsp;&nbsp;/api/config</p>
-        <p>Authorization: Bearer &lt;WINBRIDGE_SETUP_KEY&gt;</p>
+        <p>Authorization: Bearer &lt;WINREACH_SETUP_KEY&gt;</p>
       </div>
       <p className="max-w-prose text-xs leading-relaxed text-muted">
-        The endpoint stays disabled until the <code className="font-mono">WINBRIDGE_SETUP_KEY</code>{" "}
+        The endpoint stays disabled until the <code className="font-mono">WINREACH_SETUP_KEY</code>{" "}
         environment variable is set on the host running this app. Enter the same key below to
         save or load the shared configuration.
       </p>
-      <Field label="Setup key" hint="Must match WINBRIDGE_SETUP_KEY on this host.">
+      <Field label="Setup key" hint="Must match WINREACH_SETUP_KEY on this host.">
         <TextInput value={setupKey} onChange={setSetupKey} placeholder="paste your setup key" mono />
       </Field>
       <div className="flex flex-wrap items-center gap-2">

@@ -1,4 +1,4 @@
-// First-run admin creation. Gated by the operator's WINBRIDGE_SETUP_KEY so an
+// First-run admin creation. Gated by the operator's WINREACH_SETUP_KEY so an
 // anonymous caller cannot claim the admin (and thus /api/shell RCE) during the
 // window before the operator signs up. Allowed ONLY when no admin exists yet.
 
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
   }
   if (!sessionSecretAvailable()) {
     return NextResponse.json(
-      { error: "Set WINBRIDGE_SESSION_SECRET (or WINBRIDGE_DB_KEY) on the host to enable admin login.", code: "no_secret" },
+      { error: "Set WINREACH_SESSION_SECRET (or WINREACH_DB_KEY) on the host to enable admin login.", code: "no_secret" },
       { status: 503 },
     );
   }

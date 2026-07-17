@@ -12,7 +12,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // Computed once at startup; equalizes scrypt cost for the "no such user" path.
-const DUMMY_HASH = hashPassword("winbridge-login-timing-equalizer");
+const DUMMY_HASH = hashPassword("winreach-login-timing-equalizer");
 
 export async function POST(req: NextRequest) {
   const xo = crossOriginError(req);
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
   }
   if (!sessionSecretAvailable()) {
     return NextResponse.json(
-      { error: "Set WINBRIDGE_SESSION_SECRET (or WINBRIDGE_DB_KEY) on the host to enable admin login.", code: "no_secret" },
+      { error: "Set WINREACH_SESSION_SECRET (or WINREACH_DB_KEY) on the host to enable admin login.", code: "no_secret" },
       { status: 503 },
     );
   }

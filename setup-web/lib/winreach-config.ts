@@ -1,4 +1,4 @@
-// Pure helpers that turn the wizard state into ready-to-paste WinBridge config,
+// Pure helpers that turn the wizard state into ready-to-paste WinReach config,
 // firewall rules, and agent-connect snippets. No React / DOM here so this stays
 // easy to reason about and test.
 
@@ -17,8 +17,8 @@ export type ToolName = (typeof TOOL_NAMES)[number];
 
 export type AuthMode = "single" | "users";
 
-/** A per-user identity that becomes one WINBRIDGE_PRINCIPALS entry. */
-export type WinBridgeUser = {
+/** A per-user identity that becomes one WINREACH_PRINCIPALS entry. */
+export type WinReachUser = {
   id: string; // UI key only; never emitted to config
   name: string;
   role: string;
@@ -31,10 +31,10 @@ export type WinBridgeUser = {
 };
 
 /**
- * A reusable, named permission set that becomes one WINBRIDGE_ROLES entry.
+ * A reusable, named permission set that becomes one WINREACH_ROLES entry.
  * Users reference a role by name and inherit its tools + command policy.
  */
-export type WinBridgeRole = {
+export type WinReachRole = {
   id: string; // UI key only; never emitted to config
   name: string;
   /** true = every tool (omit `tools`); false = restrict to `tools`. */
@@ -60,14 +60,14 @@ export const ROLE_PRESETS: Record<
   custom: { allTools: true, tools: [], allow: [], deny: [] },
 };
 
-export type WinBridgeConfig = {
+export type WinReachConfig = {
   host: string;
   port: number;
   endpointPath: string;
   authMode: AuthMode;
   token: string;
-  roles: WinBridgeRole[];
-  users: WinBridgeUser[];
+  roles: WinReachRole[];
+  users: WinReachUser[];
   allowedOrigins: string[];
   screenshot: {
     enabled: boolean;
@@ -92,7 +92,7 @@ export type WinBridgeConfig = {
   tunnel: boolean;
 };
 
-export const DEFAULT_CONFIG: WinBridgeConfig = {
+export const DEFAULT_CONFIG: WinReachConfig = {
   host: "127.0.0.1",
   port: 7573,
   endpointPath: "/mcp",
@@ -127,11 +127,11 @@ export function generateToken(bytes = 32): string {
 }
 
 /**
- * The scalar WINBRIDGE_* environment variables implied by the config. The auth
- * variable is handled separately: WINBRIDGE_TOKEN here in single mode, and
- * WINBRIDGE_PRINCIPALS (a here-string) added by buildPowerShellEnv in users mode.
+ * The scalar WINREACH_* environment variables implied by the config. The auth
+ * variable is handled separately: WINREACH_TOKEN here in single mode, and
+ * WINREACH_PRINCIPALS (a here-string) added by buildPowerShellEnv in users mode.
  */
-export function buildEnvVars(cfg: WinBridgeConfig): EnvVar[] {
+export function buildEnvVars(cfg: WinReachConfig): EnvVar[] {
   const env: EnvVar[] = [];
   const push = (name: string, value: string | number | undefined) => {
     if (value === undefined || value === "") return;
@@ -139,36 +139,36 @@ export function buildEnvVars(cfg: WinBridgeConfig): EnvVar[] {
   };
 
   if (cfg.authMode !== "users") {
-    push("WINBRIDGE_TOKEN", cfg.token || "REPLACE_WITH_A_LONG_RANDOM_TOKEN");
+    push("WINREACH_TOKEN", cfg.token || "REPLACE_WITH_A_LONG_RANDOM_TOKEN");
   }
-  push("WINBRIDGE_HOST", cfg.host);
-  push("WINBRIDGE_PORT", cfg.port);
-  if (cfg.endpointPath && cfg.endpointPath !== "/mcp") push("WINBRIDGE_ENDPOINT_PATH", cfg.endpointPath);
-  if (cfg.allowedOrigins.length) push("WINBRIDGE_ALLOWED_ORIGINS", cfg.allowedOrigins.join(","));
+  push("WINREACH_HOST", cfg.host);
+  push("WINREACH_PORT", cfg.port);
+  if (cfg.endpointPath && cfg.endpointPath !== "/mcp") push("WINREACH_ENDPOINT_PATH", cfg.endpointPath);
+  if (cfg.allowedOrigins.length) push("WINREACH_ALLOWED_ORIGINS", cfg.allowedOrigins.join(","));
 
   if (cfg.screenshot.enabled) {
-    push("WINBRIDGE_ALLOW_SCREENSHOT", "1");
-    if (cfg.screenshot.roles.length) push("WINBRIDGE_SCREENSHOT_ROLES", cfg.screenshot.roles.join(","));
-    if (cfg.screenshot.retentionHours !== 8) push("WINBRIDGE_SCREENSHOT_RETENTION_HOURS", cfg.screenshot.retentionHours);
+    push("WINREACH_ALLOW_SCREENSHOT", "1");
+    if (cfg.screenshot.roles.length) push("WINREACH_SCREENSHOT_ROLES", cfg.screenshot.roles.join(","));
+    if (cfg.screenshot.retentionHours !== 8) push("WINREACH_SCREENSHOT_RETENTION_HOURS", cfg.screenshot.retentionHours);
   }
 
   if (cfg.fileTransfer.enabled && cfg.fileTransfer.root) {
-    push("WINBRIDGE_FILE_ROOT", cfg.fileTransfer.root);
+    push("WINREACH_FILE_ROOT", cfg.fileTransfer.root);
     if (cfg.fileTransfer.maxBytesMB !== 75) {
-      push("WINBRIDGE_MAX_FILE_BYTES", Math.round(cfg.fileTransfer.maxBytesMB * 1024 * 1024));
+      push("WINREACH_MAX_FILE_BYTES", Math.round(cfg.fileTransfer.maxBytesMB * 1024 * 1024));
     }
   }
 
-  if (cfg.policy.allow.length) push("WINBRIDGE_COMMAND_ALLOWLIST", cfg.policy.allow.join(","));
-  if (cfg.policy.deny.length) push("WINBRIDGE_COMMAND_DENYLIST", cfg.policy.deny.join(","));
+  if (cfg.policy.allow.length) push("WINREACH_COMMAND_ALLOWLIST", cfg.policy.allow.join(","));
+  if (cfg.policy.deny.length) push("WINREACH_COMMAND_DENYLIST", cfg.policy.deny.join(","));
 
   if (cfg.tls.certPath && cfg.tls.keyPath) {
-    push("WINBRIDGE_TLS_CERT", cfg.tls.certPath);
-    push("WINBRIDGE_TLS_KEY", cfg.tls.keyPath);
-    if (cfg.tls.clientCaPath) push("WINBRIDGE_TLS_CLIENT_CA", cfg.tls.clientCaPath);
+    push("WINREACH_TLS_CERT", cfg.tls.certPath);
+    push("WINREACH_TLS_KEY", cfg.tls.keyPath);
+    if (cfg.tls.clientCaPath) push("WINREACH_TLS_CLIENT_CA", cfg.tls.clientCaPath);
   }
 
-  if (cfg.tunnel) push("WINBRIDGE_TUNNEL", "cloudflare");
+  if (cfg.tunnel) push("WINREACH_TUNNEL", "cloudflare");
 
   return env;
 }
@@ -179,16 +179,16 @@ function psQuote(value: string): string {
 }
 
 /** The set of defined (non-blank) role names — the names a user can inherit from. */
-function definedRoleNames(cfg: WinBridgeConfig): Set<string> {
+function definedRoleNames(cfg: WinReachConfig): Set<string> {
   return new Set(cfg.roles.map((r) => r.name.trim()).filter(Boolean));
 }
 
 /**
- * The WINBRIDGE_ROLES JSON object (pretty-printed): a map from role name to its
+ * The WINREACH_ROLES JSON object (pretty-printed): a map from role name to its
  * permission set. `tools` is emitted only when the role restricts tools; `allow`
  * / `deny` only when non-empty. Roles with a blank name are skipped.
  */
-export function buildRolesJson(cfg: WinBridgeConfig): string {
+export function buildRolesJson(cfg: WinReachConfig): string {
   const obj: Record<string, Record<string, unknown>> = {};
   for (const r of cfg.roles) {
     const name = r.name.trim();
@@ -203,12 +203,12 @@ export function buildRolesJson(cfg: WinBridgeConfig): string {
 }
 
 /**
- * The WINBRIDGE_PRINCIPALS JSON array (pretty-printed) for the configured users.
+ * The WINREACH_PRINCIPALS JSON array (pretty-printed) for the configured users.
  * A user whose role names a defined role inherits its tools/command policy, so
  * only name/role/token are emitted. A user on a free-label role keeps its own
  * inline tools/allow/deny.
  */
-export function buildPrincipalsJson(cfg: WinBridgeConfig): string {
+export function buildPrincipalsJson(cfg: WinReachConfig): string {
   const defined = definedRoleNames(cfg);
   const entries = cfg.users.map((u) => {
     const role = u.role || "user";
@@ -228,15 +228,15 @@ export function buildPrincipalsJson(cfg: WinBridgeConfig): string {
   return JSON.stringify(entries, null, 2);
 }
 
-/** PowerShell env block: WINBRIDGE_ROLES + WINBRIDGE_PRINCIPALS (or the single token), then scalars. */
-export function buildPowerShellEnv(cfg: WinBridgeConfig): string {
+/** PowerShell env block: WINREACH_ROLES + WINREACH_PRINCIPALS (or the single token), then scalars. */
+export function buildPowerShellEnv(cfg: WinReachConfig): string {
   const lines: string[] = [];
   if (cfg.authMode === "users") {
     // Here-strings: the closing '@ must sit at column 0.
     if (definedRoleNames(cfg).size > 0) {
-      lines.push(`$env:WINBRIDGE_ROLES = @'\n${buildRolesJson(cfg)}\n'@`);
+      lines.push(`$env:WINREACH_ROLES = @'\n${buildRolesJson(cfg)}\n'@`);
     }
-    lines.push(`$env:WINBRIDGE_PRINCIPALS = @'\n${buildPrincipalsJson(cfg)}\n'@`);
+    lines.push(`$env:WINREACH_PRINCIPALS = @'\n${buildPrincipalsJson(cfg)}\n'@`);
   }
   for (const e of buildEnvVars(cfg)) {
     lines.push(`$env:${e.name} = ${psQuote(e.value)}`);
@@ -244,27 +244,27 @@ export function buildPowerShellEnv(cfg: WinBridgeConfig): string {
   return lines.join("\n");
 }
 
-const scheme = (cfg: WinBridgeConfig) => (cfg.tls.certPath && cfg.tls.keyPath ? "https" : "http");
+const scheme = (cfg: WinReachConfig) => (cfg.tls.certPath && cfg.tls.keyPath ? "https" : "http");
 
 /** The URL an agent connects to (uses the bind host; swap for a reachable host/IP as needed). */
-export function connectUrl(cfg: WinBridgeConfig): string {
+export function connectUrl(cfg: WinReachConfig): string {
   return `${scheme(cfg)}://${cfg.host}:${cfg.port}${cfg.endpointPath}`;
 }
 
 /**
- * A dotenv-style `winbridge.env` file (KEY=VALUE lines) that the host can load
- * to run WinBridge. In users mode the principals array is emitted as compact
+ * A dotenv-style `winreach.env` file (KEY=VALUE lines) that the host can load
+ * to run WinReach. In users mode the principals array is emitted as compact
  * single-line JSON so it stays on one line.
  */
-export function buildEnvFile(cfg: WinBridgeConfig): string {
+export function buildEnvFile(cfg: WinReachConfig): string {
   const lines: string[] = [];
   if (cfg.authMode === "users") {
     if (definedRoleNames(cfg).size > 0) {
       const rolesCompact = JSON.stringify(JSON.parse(buildRolesJson(cfg)));
-      lines.push(`WINBRIDGE_ROLES=${rolesCompact}`);
+      lines.push(`WINREACH_ROLES=${rolesCompact}`);
     }
     const compact = JSON.stringify(JSON.parse(buildPrincipalsJson(cfg)));
-    lines.push(`WINBRIDGE_PRINCIPALS=${compact}`);
+    lines.push(`WINREACH_PRINCIPALS=${compact}`);
   }
   for (const e of buildEnvVars(cfg)) {
     lines.push(`${e.name}=${e.value}`);
@@ -273,10 +273,10 @@ export function buildEnvFile(cfg: WinBridgeConfig): string {
 }
 
 /** A complete start-*.ps1 script: env, install, run. */
-export function buildStartScript(cfg: WinBridgeConfig): string {
+export function buildStartScript(cfg: WinReachConfig): string {
   const lines = [
-    "# WinBridge MCP - generated start script",
-    "# Review before running. Run from the winbridge-mcp checkout.",
+    "# WinReach MCP - generated start script",
+    "# Review before running. Run from the winreach-mcp checkout.",
     "",
     buildPowerShellEnv(cfg),
     "",
@@ -288,7 +288,7 @@ export function buildStartScript(cfg: WinBridgeConfig): string {
 }
 
 /** Windows firewall rule scoping the MCP port to the allowed source IPs/CIDRs. */
-export function buildFirewallRule(cfg: WinBridgeConfig): string {
+export function buildFirewallRule(cfg: WinReachConfig): string {
   const remote =
     cfg.allowedIps.length > 0
       ? cfg.allowedIps.map((ip) => `"${ip}"`).join(", ")
@@ -300,7 +300,7 @@ export function buildFirewallRule(cfg: WinBridgeConfig): string {
   return (
     `${warn}New-NetFirewallRule ` +
     "`\n" +
-    `  -DisplayName "WinBridge MCP ${cfg.port}" ` +
+    `  -DisplayName "WinReach MCP ${cfg.port}" ` +
     "`\n" +
     "  -Direction Inbound `\n" +
     "  -Protocol TCP `\n" +
@@ -313,7 +313,7 @@ export function buildFirewallRule(cfg: WinBridgeConfig): string {
 }
 
 /** `claude mcp add` command(s) for Claude Code — per-user tokens in users mode. */
-export function buildClaudeConfig(cfg: WinBridgeConfig): string {
+export function buildClaudeConfig(cfg: WinReachConfig): string {
   const url = connectUrl(cfg);
   if (cfg.authMode === "users") {
     if (!cfg.users.length) {
@@ -325,24 +325,24 @@ export function buildClaudeConfig(cfg: WinBridgeConfig): string {
         const token = u.token || "<token>";
         return (
           `# ${name} (${u.role})\n` +
-          `claude mcp add --transport http winbridge-${name} ${url} \`\n` +
+          `claude mcp add --transport http winreach-${name} ${url} \`\n` +
           `  --header "Authorization: Bearer ${token}"`
         );
       })
       .join("\n\n");
   }
   return (
-    `claude mcp add --transport http winbridge ${url} \`\n` +
-    `  --header "Authorization: Bearer $env:WINBRIDGE_TOKEN"`
+    `claude mcp add --transport http winreach ${url} \`\n` +
+    `  --header "Authorization: Bearer $env:WINREACH_TOKEN"`
   );
 }
 
 /** `~/.codex/config.toml` block for Codex. */
-export function buildCodexConfig(cfg: WinBridgeConfig): string {
+export function buildCodexConfig(cfg: WinReachConfig): string {
   const lines = [
-    "[mcp_servers.winbridge]",
+    "[mcp_servers.winreach]",
     `url = "${connectUrl(cfg)}"`,
-    'bearer_token_env_var = "WINBRIDGE_TOKEN"',
+    'bearer_token_env_var = "WINREACH_TOKEN"',
     "tool_timeout_sec = 120",
     "enabled = true",
   ];

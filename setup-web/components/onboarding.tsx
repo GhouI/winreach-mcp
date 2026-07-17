@@ -4,12 +4,12 @@
 // sits only the current step's fields ("the model"). Back / Next move between
 // steps. The final step reviews the configuration, collects the setup key, and
 // on Finish APPLIES the config to this host (POST /api/apply) — writing the
-// WINBRIDGE_* environment + a start script and persisting the config — then
+// WINREACH_* environment + a start script and persisting the config — then
 // hands off to the dashboard.
 
 import { useState } from "react";
-import type { WinBridgeConfig } from "@/lib/winbridge-config";
-import { connectUrl } from "@/lib/winbridge-config";
+import type { WinReachConfig } from "@/lib/winreach-config";
+import { connectUrl } from "@/lib/winreach-config";
 import type { FormState } from "@/lib/form-state";
 import { btnPrimary, btnSecondary, Field, StatusMsg, TextInput, Warn } from "@/components/ui";
 import { Stepper } from "@/components/stepper";
@@ -29,7 +29,7 @@ const STEPS: { id: StepId; title: string; heading: string; blurb: string }[] = [
     id: "server",
     title: "Server",
     heading: "Name & bind the server",
-    blurb: "Where WinBridge listens and which networks may reach it.",
+    blurb: "Where WinReach listens and which networks may reach it.",
   },
   {
     id: "security",
@@ -71,7 +71,7 @@ export function Onboarding({
 }: {
   form: FormState;
   set: SetField;
-  cfg: WinBridgeConfig;
+  cfg: WinReachConfig;
   onFinish: () => void;
 }) {
   const [step, setStep] = useState(0);
@@ -137,7 +137,7 @@ function FinishStep({
   form,
   onFinish,
 }: {
-  cfg: WinBridgeConfig;
+  cfg: WinReachConfig;
   form: FormState;
   onFinish: () => void;
 }) {
@@ -196,20 +196,20 @@ function FinishStep({
 
       <div className="border-t border-border pt-6">
         <Warn>
-          Finishing writes to <strong>this host</strong>. It saves the WINBRIDGE_* environment to{" "}
-          <code className="font-mono">winbridge.env</code>, writes{" "}
-          <code className="font-mono">start-winbridge.ps1</code>, and persists the configuration in
+          Finishing writes to <strong>this host</strong>. It saves the WINREACH_* environment to{" "}
+          <code className="font-mono">winreach.env</code>, writes{" "}
+          <code className="font-mono">start-winreach.ps1</code>, and persists the configuration in
           the app&apos;s data directory.
         </Warn>
       </div>
 
       <div>
         <p className="max-w-prose text-xs leading-relaxed text-muted">
-          Applying requires the <code className="font-mono">WINBRIDGE_SETUP_KEY</code> set on this
+          Applying requires the <code className="font-mono">WINREACH_SETUP_KEY</code> set on this
           host (the same key the Database and Agent access panels use).
         </p>
         <div className="mt-3">
-          <Field label="Setup key" hint="Must match WINBRIDGE_SETUP_KEY on this host.">
+          <Field label="Setup key" hint="Must match WINREACH_SETUP_KEY on this host.">
             <TextInput
               value={setupKey}
               onChange={setSetupKey}

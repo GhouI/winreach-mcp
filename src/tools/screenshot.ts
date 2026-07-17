@@ -8,7 +8,7 @@ import { screenshotToolResult } from "./results.js";
 /**
  * Register the screen-capture tool. Screen capture is a read/exfiltration
  * capability, so it is only exposed when the operator has enabled it
- * (WINBRIDGE_ALLOW_SCREENSHOT) for a role that includes this principal — and
+ * (WINREACH_ALLOW_SCREENSHOT) for a role that includes this principal — and
  * only if the principal's tool allowlist permits it.
  */
 export function registerScreenshotTools(server: McpServer, ctx: ToolContext): void {
