@@ -8,13 +8,14 @@ import { ROLE_PRESETS, TOOL_NAMES, generateToken } from "@/lib/winbridge-config"
 import { newUser, type FormUser } from "@/lib/form-state";
 import { Field, Select, TextArea, TextInput, Toggle, Warn } from "@/components/ui";
 
-const ROLES = ["admin", "operator", "readonly", "custom"];
-
 export function UsersEditor({
   users,
+  roles,
   onChange,
 }: {
   users: FormUser[];
+  /** Names of the roles defined above; a user on one of these inherits its permissions. */
+  roles: string[];
   onChange: (users: FormUser[]) => void;
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -24,7 +25,17 @@ export function UsersEditor({
   const remove = (id: string) => onChange(users.filter((u) => u.id !== id));
   const add = () => onChange([...users, newUser(`user${users.length + 1}`)]);
 
+  // "custom" keeps the inline per-user permission editor; a defined role name
+  // means the user inherits that role's tools/commands.
+  const roleOptions = (current: string) =>
+    Array.from(new Set([...roles, "custom", current].filter(Boolean)));
+
   const setRole = (id: string, role: string) => {
+    if (roles.includes(role)) {
+      // Inherited role — the user carries no inline permissions of its own.
+      update(id, { role });
+      return;
+    }
     const preset = ROLE_PRESETS[role] ?? ROLE_PRESETS.custom;
     update(id, {
       role,
@@ -61,7 +72,9 @@ export function UsersEditor({
   const tokens = users.map((u) => u.token.trim());
   const dupToken = tokens.filter(Boolean).length !== new Set(tokens.filter(Boolean)).size;
   const emptyToken = users.some((u) => !u.token.trim());
-  const noTools = users.some((u) => !u.allTools && u.tools.length === 0);
+  // Only meaningful for users editing inline permissions; inherited users get
+  // their tools from the role.
+  const noTools = users.some((u) => !roles.includes(u.role) && !u.allTools && u.tools.length === 0);
 
   return (
     <div className="space-y-4">
@@ -72,14 +85,15 @@ export function UsersEditor({
       <div className="space-y-4">
         {users.map((u) => {
           const isOpen = expanded.has(u.id);
+          const inherited = roles.includes(u.role);
           return (
             <div key={u.id} className="rounded-md border border-border bg-background/60 p-4">
               <div className="grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2">
                 <Field label="Name">
                   <TextInput value={u.name} onChange={(v) => update(u.id, { name: v })} placeholder="alice" mono />
                 </Field>
-                <Field label="Role" hint="Presets fill tools & command rules; edit below.">
-                  <Select value={u.role} onChange={(v) => setRole(u.id, v)} options={ROLES} />
+                <Field label="Role" hint="Pick a defined role to inherit, or 'custom' to set permissions here.">
+                  <Select value={u.role} onChange={(v) => setRole(u.id, v)} options={roleOptions(u.role)} />
                 </Field>
               </div>
 
@@ -106,13 +120,20 @@ export function UsersEditor({
               </div>
 
               <div className="mt-3 flex items-center justify-between">
-                <button
-                  type="button"
-                  onClick={() => toggleExpanded(u.id)}
-                  className="text-xs font-medium text-accent-text hover:underline"
-                >
-                  {isOpen ? "Hide permissions" : "Edit permissions (tools & commands)"}
-                </button>
+                {inherited ? (
+                  <span className="text-xs text-muted">
+                    Inherits <span className="font-mono text-foreground">{u.role}</span> permissions
+                    (defined above)
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => toggleExpanded(u.id)}
+                    className="text-xs font-medium text-accent-text hover:underline"
+                  >
+                    {isOpen ? "Hide permissions" : "Edit permissions (tools & commands)"}
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => remove(u.id)}
@@ -122,7 +143,7 @@ export function UsersEditor({
                 </button>
               </div>
 
-              {isOpen && (
+              {!inherited && isOpen && (
                 <div className="mt-4 space-y-4 border-t border-border pt-4">
                   <div>
                     <div className="mb-2">

@@ -30,6 +30,20 @@ export type WinBridgeUser = {
   deny: string[];
 };
 
+/**
+ * A reusable, named permission set that becomes one WINBRIDGE_ROLES entry.
+ * Users reference a role by name and inherit its tools + command policy.
+ */
+export type WinBridgeRole = {
+  id: string; // UI key only; never emitted to config
+  name: string;
+  /** true = every tool (omit `tools`); false = restrict to `tools`. */
+  allTools: boolean;
+  tools: string[];
+  allow: string[];
+  deny: string[];
+};
+
 /** Role presets applied when a role is chosen (still editable afterward). */
 export const ROLE_PRESETS: Record<
   string,
@@ -52,6 +66,7 @@ export type WinBridgeConfig = {
   endpointPath: string;
   authMode: AuthMode;
   token: string;
+  roles: WinBridgeRole[];
   users: WinBridgeUser[];
   allowedOrigins: string[];
   screenshot: {
@@ -83,6 +98,7 @@ export const DEFAULT_CONFIG: WinBridgeConfig = {
   endpointPath: "/mcp",
   authMode: "single",
   token: "",
+  roles: [],
   users: [],
   allowedOrigins: [],
   screenshot: { enabled: false, roles: [], retentionHours: 8 },
@@ -162,28 +178,64 @@ function psQuote(value: string): string {
   return `"${value.replace(/`/g, "``").replace(/"/g, '`"')}"`;
 }
 
-/** The WINBRIDGE_PRINCIPALS JSON array (pretty-printed) for the configured users. */
+/** The set of defined (non-blank) role names — the names a user can inherit from. */
+function definedRoleNames(cfg: WinBridgeConfig): Set<string> {
+  return new Set(cfg.roles.map((r) => r.name.trim()).filter(Boolean));
+}
+
+/**
+ * The WINBRIDGE_ROLES JSON object (pretty-printed): a map from role name to its
+ * permission set. `tools` is emitted only when the role restricts tools; `allow`
+ * / `deny` only when non-empty. Roles with a blank name are skipped.
+ */
+export function buildRolesJson(cfg: WinBridgeConfig): string {
+  const obj: Record<string, Record<string, unknown>> = {};
+  for (const r of cfg.roles) {
+    const name = r.name.trim();
+    if (!name) continue;
+    const def: Record<string, unknown> = {};
+    if (!r.allTools) def.tools = r.tools;
+    if (r.allow.length) def.allow = r.allow;
+    if (r.deny.length) def.deny = r.deny;
+    obj[name] = def;
+  }
+  return JSON.stringify(obj, null, 2);
+}
+
+/**
+ * The WINBRIDGE_PRINCIPALS JSON array (pretty-printed) for the configured users.
+ * A user whose role names a defined role inherits its tools/command policy, so
+ * only name/role/token are emitted. A user on a free-label role keeps its own
+ * inline tools/allow/deny.
+ */
 export function buildPrincipalsJson(cfg: WinBridgeConfig): string {
+  const defined = definedRoleNames(cfg);
   const entries = cfg.users.map((u) => {
+    const role = u.role || "user";
     const entry: Record<string, unknown> = {
       name: u.name.trim() || "user",
-      role: u.role || "user",
+      role,
       token: u.token || "REPLACE_WITH_A_TOKEN",
     };
-    if (u.allow.length) entry.allow = u.allow;
-    if (u.deny.length) entry.deny = u.deny;
-    // `tools` is only emitted when it is a real restriction; omitting it means all tools.
-    if (!u.allTools) entry.tools = u.tools;
+    if (!defined.has(role)) {
+      if (u.allow.length) entry.allow = u.allow;
+      if (u.deny.length) entry.deny = u.deny;
+      // `tools` is only emitted when it is a real restriction; omitting it means all tools.
+      if (!u.allTools) entry.tools = u.tools;
+    }
     return entry;
   });
   return JSON.stringify(entries, null, 2);
 }
 
-/** PowerShell env block: WINBRIDGE_TOKEN or WINBRIDGE_PRINCIPALS, then the scalars. */
+/** PowerShell env block: WINBRIDGE_ROLES + WINBRIDGE_PRINCIPALS (or the single token), then scalars. */
 export function buildPowerShellEnv(cfg: WinBridgeConfig): string {
   const lines: string[] = [];
   if (cfg.authMode === "users") {
-    // Here-string: the closing '@ must sit at column 0.
+    // Here-strings: the closing '@ must sit at column 0.
+    if (definedRoleNames(cfg).size > 0) {
+      lines.push(`$env:WINBRIDGE_ROLES = @'\n${buildRolesJson(cfg)}\n'@`);
+    }
     lines.push(`$env:WINBRIDGE_PRINCIPALS = @'\n${buildPrincipalsJson(cfg)}\n'@`);
   }
   for (const e of buildEnvVars(cfg)) {
@@ -207,6 +259,10 @@ export function connectUrl(cfg: WinBridgeConfig): string {
 export function buildEnvFile(cfg: WinBridgeConfig): string {
   const lines: string[] = [];
   if (cfg.authMode === "users") {
+    if (definedRoleNames(cfg).size > 0) {
+      const rolesCompact = JSON.stringify(JSON.parse(buildRolesJson(cfg)));
+      lines.push(`WINBRIDGE_ROLES=${rolesCompact}`);
+    }
     const compact = JSON.stringify(JSON.parse(buildPrincipalsJson(cfg)));
     lines.push(`WINBRIDGE_PRINCIPALS=${compact}`);
   }
