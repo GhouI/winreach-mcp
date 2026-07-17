@@ -9,6 +9,7 @@ import {
   parsePrincipals,
   type Principal
 } from "./principals.js";
+import { parseRoles } from "./roles.js";
 
 export type TunnelConfig = {
   enabled: boolean;
@@ -256,7 +257,9 @@ function loadPrincipals(): Principal[] {
 
   const principalsJson = readEnv("PRINCIPALS")?.trim();
   if (principalsJson) {
-    principals.push(...parsePrincipals(principalsJson, process.env));
+    const rolesJson = readEnv("ROLES")?.trim();
+    const roles = rolesJson ? parseRoles(rolesJson) : undefined;
+    principals.push(...parsePrincipals(principalsJson, process.env, roles));
   }
 
   if (principals.length === 0) {

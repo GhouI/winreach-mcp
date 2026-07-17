@@ -1,5 +1,6 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 import { compilePatterns, type CommandPolicy } from "./policy.js";
+import type { RoleDefinition } from "./roles.js";
 
 /**
  * A principal is an authenticated identity with a display name and role (for
@@ -62,8 +63,18 @@ export function createPrimaryPrincipal(token: string, policy: CommandPolicy): Pr
  * Parse WINBRIDGE_PRINCIPALS (a JSON array) into Principal objects. Each entry
  * supplies its token inline (`token`) or by naming an env var (`tokenEnv`), plus
  * optional `allow`/`deny` regex lists for a per-principal command policy.
+ *
+ * When `roles` is provided, a principal whose `role` names a defined role
+ * inherits that role's command policy and tool allowlist. A field the principal
+ * sets on its own entry (`allow`, `deny`, `tools`) overrides the role's value
+ * for that field; omitting the field inherits it. A `role` that isn't defined in
+ * `roles` is treated as a plain label (no inheritance).
  */
-export function parsePrincipals(raw: string, env: Record<string, string | undefined>): Principal[] {
+export function parsePrincipals(
+  raw: string,
+  env: Record<string, string | undefined>,
+  roles?: Map<string, RoleDefinition>
+): Principal[] {
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
@@ -93,14 +104,25 @@ export function parsePrincipals(raw: string, env: Record<string, string | undefi
       throw new Error(`${path} must define a non-empty "token", "tokenEnv", or "tokenHash"`);
     }
 
+    // A principal inherits its role's policy/tools for any field it doesn't set
+    // itself. An explicit field on the principal overrides the role's value.
+    const roleDef = roles?.get(role);
     const policy: CommandPolicy = {
-      allow: compilePatterns(asStringArray(raw.allow, `${path}.allow`), `${path}.allow`),
-      deny: compilePatterns(asStringArray(raw.deny, `${path}.deny`), `${path}.deny`)
+      allow:
+        raw.allow === undefined
+          ? roleDef?.policy.allow ?? []
+          : compilePatterns(asStringArray(raw.allow, `${path}.allow`), `${path}.allow`),
+      deny:
+        raw.deny === undefined
+          ? roleDef?.policy.deny ?? []
+          : compilePatterns(asStringArray(raw.deny, `${path}.deny`), `${path}.deny`)
     };
 
-    // `tools` is only a restriction when present; leave it undefined otherwise so
-    // the principal keeps access to every tool.
-    const tools = raw.tools === undefined ? undefined : asStringArray(raw.tools, `${path}.tools`);
+    // `tools` is only a restriction when present; an explicit list overrides the
+    // role's, an omitted one inherits the role's (which may itself be undefined =
+    // every tool).
+    const tools =
+      raw.tools !== undefined ? asStringArray(raw.tools, `${path}.tools`) : roleDef?.tools;
 
     return { name, role, token, tokenHash, policy, tools };
   });
