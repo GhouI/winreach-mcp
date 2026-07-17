@@ -21,6 +21,8 @@ Connect an agent over HTTP, run remote PowerShell, drive the Windows desktop, an
 
 ▶ **[Watch the full-quality MP4](assets/winreach-demo.mp4)** · built with [Remotion](https://www.remotion.dev/) (source and re-render steps in [video/](video/README.md)).
 
+There's also a vertical **4:5 LinkedIn cut** with burned-in captions — [assets/winreach-linkedin.mp4](assets/winreach-linkedin.mp4) (cover: [assets/winreach-linkedin-cover.png](assets/winreach-linkedin-cover.png), captions: [assets/winreach-linkedin.srt](assets/winreach-linkedin.srt)).
+
 ## Why WinReach?
 
 Most coding agents are comfortable in terminals, but Windows RDP is a GUI-first environment. WinReach gives agents a clean command surface instead:
