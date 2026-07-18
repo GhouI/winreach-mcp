@@ -2,6 +2,7 @@ import type { AppConfig } from "../config.js";
 import type { AuditLogger } from "../audit.js";
 import type { Principal } from "../principals.js";
 import type { PowerShellResult } from "../powershell/types.js";
+import { resolveBashPath } from "../bash/shell.js";
 import { evaluatePolicies } from "../policy.js";
 
 /**
@@ -101,4 +102,17 @@ export function isComputerUseAllowed(config: AppConfig, principal: Principal): b
   }
   const roles = config.computerUse.allowedRoles;
   return roles.length === 0 || roles.includes(principal.role);
+}
+
+/**
+ * Whether the Git Bash tool family may be offered. Bash is an alternate
+ * execution surface under the same command policy, so it is gated only by the
+ * operator enable flag (WINREACH_ALLOW_BASH) and whether `bash.exe` resolves —
+ * the per-principal `tools` allowlist still gates each individual tool.
+ */
+export function isBashAvailable(config: AppConfig): boolean {
+  if (!config.bash.enabled) {
+    return false;
+  }
+  return resolveBashPath(config.bash.path) !== undefined;
 }

@@ -70,6 +70,20 @@ export type FileTransferConfig = {
   maxBytes: number;
 };
 
+/**
+ * Authorization for the Git Bash tool family (`bash_execute`, `bash_*_session`).
+ * Bash is an alternate execution surface subject to the same command policy, so
+ * it is additive to PowerShell but still opt-in: disabled by default, and only
+ * registered when `bash.exe` is resolvable. Runtime limits (cwd, timeout, output
+ * cap) are shared with PowerShell via the top-level `AppConfig` fields.
+ */
+export type BashConfig = {
+  /** When false the bash tool family is not registered at all. */
+  enabled: boolean;
+  /** Explicit `bash.exe` path (WINREACH_BASH_PATH); overrides auto-detection. */
+  path?: string;
+};
+
 export type AppConfig = {
   name: string;
   version: string;
@@ -90,6 +104,8 @@ export type AppConfig = {
   computerUse: ComputerUseConfig;
   /** File-transfer authorization. Disabled unless a root directory is set. */
   fileTransfer: FileTransferConfig;
+  /** Git Bash tool family. Disabled unless explicitly enabled. */
+  bash: BashConfig;
   allowedOrigins: string[];
   shellPath?: string;
   defaultCwd: string;
@@ -239,6 +255,13 @@ function loadFileTransferConfig(): FileTransferConfig {
   };
 }
 
+function loadBashConfig(): BashConfig {
+  return {
+    enabled: readBoolEnv("ALLOW_BASH", false),
+    path: readEnv("BASH_PATH")?.trim() || undefined
+  };
+}
+
 function loadGlobalPolicy(): CommandPolicy {
   return {
     allow: compilePatterns(readPatternListEnv("COMMAND_ALLOWLIST"), "WINREACH_COMMAND_ALLOWLIST"),
@@ -316,6 +339,7 @@ export function loadConfig(): AppConfig {
     screenshot: loadScreenshotConfig(),
     computerUse: loadComputerUseConfig(),
     fileTransfer: loadFileTransferConfig(),
+    bash: loadBashConfig(),
     allowedOrigins: readListEnv("ALLOWED_ORIGINS"),
     shellPath: readEnv("SHELL_PATH"),
     defaultCwd: readEnv("CWD") ?? process.cwd(),

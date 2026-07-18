@@ -24,7 +24,7 @@ function printConnectionHelp(mcpUrl: string): void {
 export async function main(): Promise<void> {
   const config = loadConfig();
   const tunnelRequested = config.tunnel.enabled || process.argv.includes("--tunnel");
-  const { app, sessions } = createWinReachApp(config);
+  const { app, sessions, bashSessions } = createWinReachApp(config);
 
   if (config.screenshot.enabled) {
     // Prune any captures left over from a previous run before serving requests.
@@ -72,6 +72,7 @@ export async function main(): Promise<void> {
     if (shuttingDown) return;
     shuttingDown = true;
     sessions.closeAll();
+    bashSessions.closeAll();
     const finish = () => httpServer.close(() => process.exit(0));
     if (tunnel) {
       void tunnel.stop().finally(finish);
