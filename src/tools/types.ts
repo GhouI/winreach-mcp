@@ -2,6 +2,7 @@ import type { AppConfig } from "../config.js";
 import type { AuditLogger } from "../audit.js";
 import type { Principal } from "../principals.js";
 import type { PowerShellSessionManager } from "../powershell/session.js";
+import type { RateLimiterStore } from "../rateLimit.js";
 
 /**
  * Shared context handed to every tool-registration child. It bundles the
@@ -14,6 +15,11 @@ export interface ToolContext {
   sessions: PowerShellSessionManager;
   principal: Principal;
   audit: AuditLogger;
+  /**
+   * Process-lifetime, per-principal rate-limit store shared across requests.
+   * Consulted before every tool call so a runaway principal is throttled.
+   */
+  rateLimiter: RateLimiterStore;
   /**
    * A principal with a `tools` allowlist only sees the tools it lists; without
    * one it sees every tool (subject to the per-tool gates in each child).

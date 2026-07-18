@@ -13,6 +13,7 @@ import { compilePatterns } from "../src/policy.js";
 import { createPrimaryPrincipal, parsePrincipals, type Principal } from "../src/principals.js";
 import { createServerForApp, type TlsConfig } from "../src/tls.js";
 import { createWinReachApp, createWinReachMcpServer } from "../src/mcpServer.js";
+import { RateLimiterStore } from "../src/rateLimit.js";
 import { PowerShellSessionManager } from "../src/powershell/session.js";
 import type { AppConfig } from "../src/config.js";
 import { ensureTlsFixtures } from "./support/tls-fixtures.js";
@@ -34,6 +35,7 @@ function makeConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     port: 0,
     endpointPath: "/mcp",
     principals: [createPrimaryPrincipal("admin-token", { allow: [], deny: [] })],
+    rateLimit: { perMin: 0, dailyQuota: 0 },
     globalPolicy: { allow: [], deny: compilePatterns(["Remove-Item", "Format-Volume"], "deny") },
     screenshot: { enabled: false, allowedRoles: [], dir: join(tmpdir(), "winreach-shots-test"), retentionMs: 0 },
     computerUse: { enabled: false, allowedRoles: [], keyDenylist: [], maxActionsPerSec: 10, auditText: false },
@@ -471,6 +473,105 @@ describe("file transfer gating", () => {
     const downResult = JSON.parse(down.content[0].text) as { success: boolean; base64: string };
     expect(downResult.success).toBe(true);
     expect(Buffer.from(downResult.base64, "base64").equals(payload)).toBe(true);
+  });
+});
+
+describe("per-principal rate limiting", () => {
+  function tempAudit(): string {
+    const dir = mkdtempSync(join(tmpdir(), "winreach-rl-"));
+    cleanups.push(() => rmSync(dir, { recursive: true, force: true }));
+    return join(dir, "audit.jsonl");
+  }
+
+  /** Connect a client whose server shares `store`, so limits accumulate across calls. */
+  async function connect(config: AppConfig, principal: Principal, auditPath: string, store: RateLimiterStore) {
+    const sessions = new PowerShellSessionManager(config);
+    const audit = createAuditLogger(auditPath);
+    const server = createWinReachMcpServer(config, sessions, principal, audit, store);
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: "test-client", version: "0.0.0" });
+    await Promise.all([client.connect(clientTransport), server.connect(serverTransport)]);
+    cleanups.push(() => {
+      sessions.closeAll();
+      void client.close();
+      void server.close();
+    });
+    return { client, sessions };
+  }
+
+  type ToolResponse = { isError?: boolean; content: Array<{ text: string }> };
+  const openSession = (client: Client) =>
+    client.callTool({ name: "powershell_open_session", arguments: {} }) as Promise<ToolResponse>;
+
+  it("throttles the next call over the per-minute limit, blocks the tool, and audits it", async () => {
+    const auditPath = tempAudit();
+    const config = makeConfig({ rateLimit: { perMin: 1, dailyQuota: 0 } });
+    const { client, sessions } = await connect(config, config.principals[0], auditPath, new RateLimiterStore());
+
+    const first = await openSession(client);
+    expect(first.isError).toBeFalsy();
+    expect(sessions.list()).toHaveLength(1);
+
+    const second = await openSession(client);
+    expect(second.isError).toBe(true);
+    const payload = JSON.parse(second.content[0].text) as { blocked: boolean; reason: string; retryAfter: number };
+    expect(payload.blocked).toBe(true);
+    expect(payload.reason).toBe("rate limited");
+    expect(payload.retryAfter).toBeGreaterThan(0);
+    // The tool did not run: no second session was opened.
+    expect(sessions.list()).toHaveLength(1);
+
+    const log = readFileSync(auditPath, "utf8");
+    expect(log).toContain("\"decision\":\"blocked\"");
+    expect(log).toContain("\"reason\":\"rate limited\"");
+  });
+
+  it("blocks with 'quota exceeded' once the daily quota is spent", async () => {
+    const auditPath = tempAudit();
+    const config = makeConfig({ rateLimit: { perMin: 0, dailyQuota: 1 } });
+    const { client } = await connect(config, config.principals[0], auditPath, new RateLimiterStore());
+
+    expect((await openSession(client)).isError).toBeFalsy();
+    const blocked = await openSession(client);
+    expect(blocked.isError).toBe(true);
+    expect(JSON.parse(blocked.content[0].text).reason).toBe("quota exceeded");
+  });
+
+  it("lets a per-principal override take precedence over the global default", async () => {
+    const auditPath = tempAudit();
+    // Global default is generous; the principal's own limit is 1/min and wins.
+    const [tight] = parsePrincipals(
+      JSON.stringify([{ name: "tight", role: "user", token: "tight-token", rateLimitPerMin: 1 }]),
+      {}
+    );
+    const config = makeConfig({ principals: [tight], rateLimit: { perMin: 1000, dailyQuota: 0 } });
+    const { client } = await connect(config, tight, auditPath, new RateLimiterStore());
+
+    expect((await openSession(client)).isError).toBeFalsy();
+    expect((await openSession(client)).isError).toBe(true);
+  });
+
+  it("keeps one principal's throttling from affecting another (shared store, distinct budgets)", async () => {
+    const store = new RateLimiterStore();
+    const config = makeConfig({ rateLimit: { perMin: 1, dailyQuota: 0 } });
+    const [alice] = parsePrincipals(JSON.stringify([{ name: "alice", token: "alice-token" }]), {});
+    const [bob] = parsePrincipals(JSON.stringify([{ name: "bob", token: "bob-token" }]), {});
+
+    const a = await connect(config, alice, tempAudit(), store);
+    const b = await connect(config, bob, tempAudit(), store);
+
+    expect((await openSession(a.client)).isError).toBeFalsy();
+    expect((await openSession(a.client)).isError).toBe(true); // alice throttled
+    // bob shares the same store but has his own budget -> unaffected.
+    expect((await openSession(b.client)).isError).toBeFalsy();
+  });
+
+  it("is disabled by default: no throttling when no limits are configured", async () => {
+    const config = makeConfig(); // rateLimit { perMin: 0, dailyQuota: 0 }
+    const { client } = await connect(config, config.principals[0], tempAudit(), new RateLimiterStore());
+    for (let i = 0; i < 5; i++) {
+      expect((await openSession(client)).isError).toBeFalsy();
+    }
   });
 });
 
