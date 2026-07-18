@@ -1,0 +1,2 @@
+# Shell scripts must keep LF endings so `curl ... | bash` works from any host.
+*.sh text eol=lf
