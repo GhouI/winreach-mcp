@@ -2,6 +2,7 @@ import type { AppConfig } from "../config.js";
 import type { AuditLogger } from "../audit.js";
 import type { Principal } from "../principals.js";
 import type { PowerShellSessionManager } from "../powershell/session.js";
+import type { BashSessionManager } from "../bash/session.js";
 
 /**
  * Shared context handed to every tool-registration child. It bundles the
@@ -12,6 +13,8 @@ import type { PowerShellSessionManager } from "../powershell/session.js";
 export interface ToolContext {
   config: AppConfig;
   sessions: PowerShellSessionManager;
+  /** Persistent Git Bash sessions, sibling to the PowerShell `sessions`. */
+  bashSessions: BashSessionManager;
   principal: Principal;
   audit: AuditLogger;
   /**

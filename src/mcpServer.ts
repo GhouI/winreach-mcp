@@ -10,13 +10,16 @@ import { createAuditLogger, type AuditLogger } from "./audit.js";
 import type { Principal } from "./principals.js";
 import { PowerShellSessionManager } from "./powershell/session.js";
 import type { PowerShellResult } from "./powershell/types.js";
+import { BashSessionManager } from "./bash/session.js";
+import { toBashRuntime } from "./bash/shell.js";
 import { registerTools, type ToolContext } from "./tools/index.js";
 
 export function createWinReachMcpServer(
   config: AppConfig,
   sessions: PowerShellSessionManager,
   principal: Principal,
-  audit: AuditLogger
+  audit: AuditLogger,
+  bashSessions: BashSessionManager = new BashSessionManager(toBashRuntime(config))
 ): McpServer {
   const server = new McpServer({
     name: config.name,
@@ -38,7 +41,7 @@ export function createWinReachMcpServer(
   const allowsTool = (tool: string): boolean =>
     principal.tools === undefined || principal.tools.includes(tool);
 
-  const ctx: ToolContext = { config, sessions, principal, audit, allowsTool };
+  const ctx: ToolContext = { config, sessions, bashSessions, principal, audit, allowsTool };
   registerTools(server, ctx);
 
   return server;
@@ -83,6 +86,7 @@ function createMcpApp(config: AppConfig) {
 
 export function createWinReachApp(config: AppConfig) {
   const sessions = new PowerShellSessionManager(config);
+  const bashSessions = new BashSessionManager(toBashRuntime(config));
   const audit = createAuditLogger(config.auditLogPath);
   const app = createMcpApp(config);
 
@@ -106,7 +110,7 @@ export function createWinReachApp(config: AppConfig) {
       return;
     }
 
-    const server = createWinReachMcpServer(config, sessions, principal, audit);
+    const server = createWinReachMcpServer(config, sessions, principal, audit, bashSessions);
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined
     });
@@ -155,7 +159,7 @@ export function createWinReachApp(config: AppConfig) {
     });
   });
 
-  return { app, sessions, audit };
+  return { app, sessions, bashSessions, audit };
 }
 
 export function createCommandId(): string {

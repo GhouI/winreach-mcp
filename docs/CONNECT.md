@@ -165,6 +165,22 @@ Extensions) to install. Requires the `winreach-mcp` npm package to be published 
 
 ---
 
+## Optional capabilities
+
+By default WinReach exposes only the PowerShell tools. The extra tool families are
+opt-in via environment variables on the server (set them wherever you launch
+WinReach — a shell, the service config, or a client's `env` block):
+
+- `WINREACH_ALLOW_BASH=1` — adds the `bash_*` Git Bash tools (one-shot + persistent
+  sessions), under the same command policy and audit as PowerShell. Set
+  `WINREACH_BASH_PATH` if `bash.exe` isn't at a standard Git-for-Windows path.
+- `WINREACH_ALLOW_SCREENSHOT=1` — adds `take_screenshot`.
+- `WINREACH_ALLOW_COMPUTER_USE=1` — adds `computer_use` (desktop input).
+- `WINREACH_FILE_ROOT=<dir>` — adds `file_upload` / `file_download`, sandboxed to that dir.
+
+See the [README configuration reference](../README.md#configuration) and
+[SECURITY.md](../SECURITY.md) for the full list and hardening notes.
+
 ## Registries
 
 - **MCP Registry** — [`server.json`](../server.json) describes the npm package

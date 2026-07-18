@@ -77,7 +77,7 @@ The `winreach-mcp` CLI:
 
 ## Tooling
 
-WinReach exposes up to eight MCP tools (the last three are opt-in):
+WinReach exposes up to thirteen MCP tools (everything after the first five is opt-in):
 
 | Tool | Purpose |
 | --- | --- |
@@ -86,10 +86,24 @@ WinReach exposes up to eight MCP tools (the last three are opt-in):
 | `powershell_send` | Send a command to a persistent session. |
 | `powershell_close_session` | Close a persistent session. |
 | `powershell_list_sessions` | List active sessions. |
+| `bash_execute` | Run one isolated Git Bash command. Off by default (see below). |
+| `bash_open_session` | Start a persistent Git Bash session. Off by default. |
+| `bash_send` | Send a command to a persistent bash session. Off by default. |
+| `bash_close_session` | Close a persistent bash session. Off by default. |
+| `bash_list_sessions` | List active bash sessions. Off by default. |
 | `take_screenshot` | Capture the current screen of the Windows host as an image. Off by default (see below). |
 | `computer_use` | Control the desktop like a human — move/click the mouse, type text, press key chords, and scroll — via Win32 `SendInput`. Coordinates match `take_screenshot`. Off by default; admin/operator roles recommended (see below). |
 | `file_upload` | Write a file to the host, inside the configured file root. Off by default (see below). |
 | `file_download` | Read a file from the host (optionally moving it) as base64. Off by default (see below). |
+
+The `bash_*` tools mirror the PowerShell family but target Git Bash's `bash.exe`
+(from Git for Windows). They run under the **same command allow/deny policy,
+per-principal `tools` allowlist, and audit log** as PowerShell — bash is an
+additional execution surface, not a policy bypass. The family is **disabled by
+default**: enable it with `WINREACH_ALLOW_BASH=1`. WinReach auto-detects Git Bash
+at the common install paths (e.g. `C:\Program Files\Git\bin\bash.exe`); set
+`WINREACH_BASH_PATH` to point at a specific `bash.exe`. When bash is disabled or
+cannot be resolved, none of the `bash_*` tools are offered.
 
 Command results include:
 
@@ -334,6 +348,8 @@ WinReach reads `WINREACH_*` variables.
 | `WINREACH_ENDPOINT_PATH` | `/mcp` | MCP endpoint path. |
 | `WINREACH_ALLOWED_ORIGINS` | empty | Comma-separated allowed `Origin` values. |
 | `WINREACH_SHELL_PATH` | auto | Explicit `pwsh` or `powershell.exe` path. |
+| `WINREACH_ALLOW_BASH` | `0` | Set to `1` to enable the `bash_*` Git Bash tool family. Disabled by default. Bash runs under the same command policy and audit as PowerShell. |
+| `WINREACH_BASH_PATH` | auto | Explicit `bash.exe` path. When unset, WinReach probes the common Git-for-Windows install paths. |
 | `WINREACH_CWD` | process cwd | Default working directory. |
 | `WINREACH_TIMEOUT_MS` | `30000` | Default command timeout. |
 | `WINREACH_MAX_OUTPUT_BYTES` | `1048576` | Max captured bytes per output stream. |

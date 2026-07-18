@@ -38,6 +38,7 @@ function makeConfig(overrides: Partial<AppConfig> = {}): AppConfig {
     screenshot: { enabled: false, allowedRoles: [], dir: join(tmpdir(), "winreach-shots-test"), retentionMs: 0 },
     computerUse: { enabled: false, allowedRoles: [], keyDenylist: [], maxActionsPerSec: 10, auditText: false },
     fileTransfer: { enabled: false, maxBytes: 50 * 1024 * 1024 },
+    bash: { enabled: false },
     allowedOrigins: [],
     defaultCwd: process.cwd(),
     defaultTimeoutMs: 5000,
@@ -527,5 +528,102 @@ describe("per-principal tool allowlist", () => {
     // In the allowlist but globally disabled -> still hidden.
     const disabled = await listToolNames(makeConfig(), principal(["powershell_execute", "take_screenshot"]));
     expect(disabled).not.toContain("take_screenshot");
+  });
+});
+
+describe("bash tool family gating + policy", () => {
+  // An explicit path makes bash resolvable deterministically on any platform
+  // (resolveBashPath trusts a configured path without probing the filesystem),
+  // so registration/gating is exercised without a real Git Bash install.
+  const bashEnabled = { enabled: true, path: "/usr/bin/bash" };
+
+  async function listToolNames(config: AppConfig, principal: Principal): Promise<string[]> {
+    const sessions = new PowerShellSessionManager(config);
+    const server = createWinReachMcpServer(config, sessions, principal, createAuditLogger(undefined));
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: "test-client", version: "0.0.0" });
+    await Promise.all([client.connect(clientTransport), server.connect(serverTransport)]);
+    cleanups.push(() => {
+      sessions.closeAll();
+      void client.close();
+      void server.close();
+    });
+    const { tools } = await client.listTools();
+    return tools.map((tool) => tool.name);
+  }
+
+  const admin = () => createPrimaryPrincipal("admin-token", { allow: [], deny: [] });
+  const bashTools = [
+    "bash_execute",
+    "bash_open_session",
+    "bash_send",
+    "bash_close_session",
+    "bash_list_sessions"
+  ];
+
+  it("is off by default (not registered when disabled)", async () => {
+    const names = await listToolNames(makeConfig(), admin());
+    for (const tool of bashTools) {
+      expect(names).not.toContain(tool);
+    }
+  });
+
+  it("registers the whole family when enabled and bash resolves", async () => {
+    const names = await listToolNames(makeConfig({ bash: bashEnabled }), admin());
+    for (const tool of bashTools) {
+      expect(names).toContain(tool);
+    }
+    // PowerShell is unchanged and still present.
+    expect(names).toContain("powershell_execute");
+  });
+
+  it("is withheld when the principal's tool allowlist excludes it", async () => {
+    const restricted: Principal = {
+      name: "scoped",
+      role: "admin",
+      token: "scoped-token",
+      policy: { allow: [], deny: [] },
+      tools: ["powershell_execute", "bash_execute"]
+    };
+    const names = await listToolNames(makeConfig({ bash: bashEnabled }), restricted);
+    expect(names).toContain("bash_execute");
+    expect(names).not.toContain("bash_send");
+    expect(names).not.toContain("bash_list_sessions");
+  });
+
+  it("blocks a denied command run through bash_execute and audits it as blocked", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "winreach-bash-"));
+    cleanups.push(() => rmSync(dir, { recursive: true, force: true }));
+    const auditPath = join(dir, "audit.jsonl");
+
+    const config = makeConfig({
+      bash: bashEnabled,
+      globalPolicy: { allow: [], deny: compilePatterns(["rm\\s+-rf"], "deny") }
+    });
+    const sessions = new PowerShellSessionManager(config);
+    const audit = createAuditLogger(auditPath);
+    const server = createWinReachMcpServer(config, sessions, config.principals[0], audit);
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: "test-client", version: "0.0.0" });
+    await Promise.all([client.connect(clientTransport), server.connect(serverTransport)]);
+    cleanups.push(() => {
+      sessions.closeAll();
+      void client.close();
+      void server.close();
+    });
+
+    // The policy is enforced before bash is ever spawned, so this asserts the
+    // "bash is not a policy bypass" contract without needing a real bash.exe.
+    const result = (await client.callTool({
+      name: "bash_execute",
+      arguments: { command: "rm -rf /tmp/data" }
+    })) as { isError?: boolean; content: Array<{ text: string }> };
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toContain("blocked");
+
+    const log = readFileSync(auditPath, "utf8");
+    expect(log).toContain("\"decision\":\"blocked\"");
+    expect(log).toContain("\"tool\":\"bash_execute\"");
   });
 });

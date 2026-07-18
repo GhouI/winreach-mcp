@@ -28,6 +28,23 @@ export const closeInputSchema = {
   sessionId: z.string().min(1).describe("PowerShell session id")
 };
 
+export const bashCommandInputSchema = {
+  command: z.string().min(1).describe("Bash command to execute"),
+  cwd: z.string().optional().describe("Working directory for this command"),
+  env: z.record(z.string(), z.string()).optional().describe("Additional environment variables"),
+  timeoutMs: z.number().positive().optional().describe("Command timeout in milliseconds"),
+  maxOutputBytes: z.number().positive().optional().describe("Maximum bytes captured per stream")
+};
+
+export const bashSendInputSchema = {
+  sessionId: z.string().min(1).describe("Bash session id"),
+  ...bashCommandInputSchema
+};
+
+export const bashCloseInputSchema = {
+  sessionId: z.string().min(1).describe("Bash session id")
+};
+
 export const screenshotInputSchema = {
   format: z
     .enum(["png", "jpeg"])
