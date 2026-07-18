@@ -34,7 +34,53 @@ Most coding agents are comfortable in terminals, but Windows RDP is a GUI-first 
 - Test locally with a diagnostic client before connecting a real agent.
 - Avoid IIS: WinReach is a standalone Node HTTP server.
 
-## Install & Connect (npx)
+## Install & Connect
+
+### Easiest: one-command launcher
+
+The fastest way from nothing to a running WinReach. The launcher ensures WinReach
+is available (via `npx winreach-mcp` — no clone, no build), and **opens the setup
+onboarding UI the first time** so you can generate keys, roles, and command
+policies. Once setup is saved (to `~/.winreach/winreach.env`), later runs skip
+onboarding and start the server directly. WinReach is a web-controlled MCP server,
+so the "package" is a launcher script, not a binary or installer.
+
+**Windows PowerShell:**
+
+```powershell
+irm https://github.com/GhouI/winreach-mcp/releases/latest/download/start-winreach.ps1 | iex
+```
+
+**Git Bash / sh:**
+
+```bash
+curl -fsSL https://github.com/GhouI/winreach-mcp/releases/latest/download/start-winreach.sh | bash
+```
+
+> [!WARNING]
+> **Piping a script straight from the internet into a shell runs whatever it
+> contains.** Prefer to download, read, and verify it before running — every
+> release attaches a `SHA256SUMS.txt`:
+>
+> ```powershell
+> # PowerShell — download, verify, then run
+> irm https://github.com/GhouI/winreach-mcp/releases/latest/download/start-winreach.ps1 -OutFile start-winreach.ps1
+> (Get-FileHash start-winreach.ps1 -Algorithm SHA256).Hash   # compare to SHA256SUMS.txt
+> ./start-winreach.ps1
+> ```
+>
+> ```bash
+> # Git Bash — download, verify, then run
+> curl -fsSL -o start-winreach.sh https://github.com/GhouI/winreach-mcp/releases/latest/download/start-winreach.sh
+> sha256sum start-winreach.sh   # compare to SHA256SUMS.txt
+> bash start-winreach.sh
+> ```
+
+Already have a checkout? Run `./start-winreach.ps1` (or `./start-winreach.sh`)
+directly. Add `-Tunnel` / `--tunnel` to publish a public Cloudflare URL, or
+`-ForceSetup` / `--force-setup` to re-open onboarding.
+
+### Manual: npx
 
 No clone, no build. WinReach ships as an npm package with a `winreach-mcp` binary.
 

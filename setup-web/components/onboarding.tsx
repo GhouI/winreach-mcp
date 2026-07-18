@@ -128,7 +128,7 @@ export function Onboarding({
 
 type ApplyResult = {
   dataDir: string;
-  wrote: { envFile: string; startScript: string; config: string };
+  wrote: { envFile: string; startScript: string; config: string; globalEnvFile?: string };
   envVarCount: number;
 };
 
@@ -239,6 +239,9 @@ function FinishStep({
             <li className="break-all">{result.wrote.envFile}</li>
             <li className="break-all">{result.wrote.startScript}</li>
             <li className="break-all">{result.wrote.config}</li>
+            {result.wrote.globalEnvFile && (
+              <li className="break-all">{result.wrote.globalEnvFile}</li>
+            )}
           </ul>
           <p className="mt-2 text-xs text-muted">
             {result.envVarCount} environment variable{result.envVarCount === 1 ? "" : "s"} applied.

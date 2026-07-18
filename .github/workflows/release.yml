@@ -1,0 +1,59 @@
+name: Release
+
+# On a version tag (e.g. v0.2.1), build the package and publish a GitHub Release
+# with the one-command launcher scripts attached, plus a SHA256SUMS file so
+# operators can verify the bootstrap before piping it to a shell. Does NOT publish
+# to npm — winreach-mcp is released to npm separately.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and attach launcher scripts
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Pack npm tarball
+        run: npm pack
+
+      - name: Generate checksums
+        run: |
+          shopt -s nullglob
+          sha256sum start-winreach.ps1 start-winreach.sh winreach-mcp-*.tgz > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          ASSETS=(start-winreach.ps1 start-winreach.sh SHA256SUMS.txt winreach-mcp-*.tgz)
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${ASSETS[@]}" --clobber
+          else
+            gh release create "$TAG" "${ASSETS[@]}" \
+              --title "$TAG" \
+              --verify-tag \
+              --generate-notes
+          fi

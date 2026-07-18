@@ -1,15 +1,19 @@
 // Apply endpoint — takes the generated setup config and writes it into effect
-// on THIS host. It does three things, all under a server-chosen data dir:
+// on THIS host. It does four things:
 //
-//   1. writes  data/winreach.env         (dotenv WINREACH_* the host can load)
-//   2. writes  data/start-winreach.ps1   (a ready-to-run PowerShell start script)
+//   1. writes  data/winreach.env             (dotenv WINREACH_* the host can load)
+//   2. writes  data/start-winreach.ps1       (a ready-to-run PowerShell start script)
 //   3. persists the config via the shared config store (data/winreach-setup.config.json)
+//   4. writes  ~/.winreach/winreach.env      (the global setup-complete signal the
+//              start-winreach.ps1 / start-winreach.sh launchers key on: its presence
+//              means onboarding is done, and the launcher loads it as the server env)
 //
 // Auth: Authorization: Bearer <WINREACH_SETUP_KEY> (or x-setup-key header) — the
 // endpoint is DISABLED until WINREACH_SETUP_KEY is set on the host, so nothing is
 // exposed by default. Same-origin + body-cap + rate-limit guards apply.
 
 import { promises as fs } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { NextResponse, type NextRequest } from "next/server";
 import { authorizeSetupKey } from "@/lib/setup-key";
@@ -47,6 +51,12 @@ export async function POST(req: NextRequest) {
   const scriptPath = path.join(dataDir, "start-winreach.ps1");
   const configPath = path.join(dataDir, "winreach-setup.config.json");
 
+  // The launcher's setup-complete signal: a global env file in the user's home
+  // directory. start-winreach.ps1 / .sh treat its presence as "onboarding done"
+  // and load it as the server's WINREACH_* environment.
+  const globalDir = path.join(os.homedir(), ".winreach");
+  const globalEnvPath = path.join(globalDir, "winreach.env");
+
   const envFile = buildEnvFile(config);
   const startScript = buildStartScript(config);
   const envCount = buildEnvVars(config).length + (config.authMode === "users" ? 1 : 0);
@@ -57,6 +67,17 @@ export async function POST(req: NextRequest) {
     await fs.writeFile(scriptPath, startScript, "utf8");
     const saved = await writeStoredConfig(config, "web");
 
+    // Best-effort: the launcher signal is convenience, not correctness. If the
+    // home directory is not writable, the primary data-dir writes above still
+    // succeeded, so don't fail the whole apply over it.
+    let globalEnvFile: string | undefined = globalEnvPath;
+    try {
+      await fs.mkdir(globalDir, { recursive: true });
+      await fs.writeFile(globalEnvPath, envFile, "utf8");
+    } catch {
+      globalEnvFile = undefined;
+    }
+
     return NextResponse.json({
       ok: true,
       dataDir,
@@ -64,6 +85,7 @@ export async function POST(req: NextRequest) {
         envFile: envPath,
         startScript: scriptPath,
         config: configPath,
+        globalEnvFile,
       },
       envVarCount: envCount,
       updatedAt: saved.updatedAt,
