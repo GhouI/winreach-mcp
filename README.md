@@ -231,9 +231,49 @@ Notes:
 
 - `cloudflared` connects to WinReach over loopback, so tunnel mode needs **no** `0.0.0.0` bind and **no** inbound firewall rule. WinReach tells `cloudflared` to rewrite the forwarded `Host` header to `127.0.0.1` so the server's built-in DNS-rebinding protection keeps working.
 - Tunnel mode publishes a remote-command server to the public internet, protected **only** by the bearer token. Use a long random `WINREACH_TOKEN` (32+ characters); WinReach warns at startup if the token looks weak.
-- Quick-tunnel hostnames are random and **change every restart**. Re-paste the printed URL into your agent, or move to a [named Cloudflare tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) for a stable hostname.
+- Quick-tunnel hostnames are random and **change every restart**. Re-paste the printed URL into your agent, or move to a **named tunnel** (below) for a stable hostname.
 - The bearer token is still enforced over the tunnel. Treat the public URL as sensitive and rotate the token after demos.
 - Auto-install downloads and runs the official `cloudflared` binary from GitHub releases over HTTPS. If you need a verified/pinned binary, set `WINREACH_TUNNEL_AUTOINSTALL=0` and point `WINREACH_CLOUDFLARED_PATH` at a `cloudflared` you installed and checked yourself.
+
+### Stable Hostname With a Named Tunnel
+
+The quick tunnel above is ephemeral — Cloudflare mints a new random `*.trycloudflare.com` hostname on every restart, which breaks any pinned MCP config (Smithery, a saved `claude mcp add`, a client `mcp.json`). For a **stable hostname you own** (e.g. `winreach.example.com`), run WinReach behind a **named Cloudflare tunnel**.
+
+> **You bring your own tunnel.** WinReach never provisions, hosts, or owns any Cloudflare tunnel, and there is no WinReach-owned Cloudflare account. You create the tunnel in **your own** Cloudflare account and hand WinReach the resulting token + hostname; WinReach's only job is to run `cloudflared` with them.
+
+**Prerequisites (done once, in your own Cloudflare account):**
+
+1. A Cloudflare account with a **domain (zone) added to Cloudflare**.
+2. Create a **named tunnel** and copy its **tunnel token**. Either:
+   - **Dashboard:** Zero Trust → Networks → Tunnels → *Create a tunnel* → *Cloudflared* → name it → copy the token from the install command Cloudflare shows.
+   - **CLI:** `cloudflared tunnel login` then `cloudflared tunnel create winreach` (the token for a dashboard-managed tunnel is shown in the dashboard; the CLI `create` path produces a credentials file — this WinReach mode uses the **token**).
+3. Add a **public hostname** to the tunnel pointing at the WinReach service, which creates the DNS route for you:
+   - **Dashboard:** the tunnel's *Public Hostname* tab → *Add a public hostname* → subdomain `winreach`, your domain, **Service** `HTTP` → `127.0.0.1:7573`.
+   - **CLI equivalent:** `cloudflared tunnel route dns winreach winreach.example.com` (creates the CNAME to `<UUID>.cfargotunnel.com`).
+4. Give WinReach the token + hostname and start it:
+
+```powershell
+$env:WINREACH_TOKEN = "replace-with-a-long-random-token"
+$env:WINREACH_TUNNEL_TOKEN = "eyJ...your-cloudflare-tunnel-token..."   # secret
+$env:WINREACH_TUNNEL_HOSTNAME = "winreach.example.com"
+npm run dev
+```
+
+Output:
+
+```text
+WinReach MCP listening at http://127.0.0.1:7573/mcp
+Named Cloudflare tunnel ready (stable hostname): https://winreach.example.com
+Public MCP endpoint: https://winreach.example.com/mcp
+...
+```
+
+Named mode is **inferred** from the presence of both `WINREACH_TUNNEL_TOKEN` and `WINREACH_TUNNEL_HOSTNAME` (no separate mode flag), and supplying them also enables the tunnel. The `https://<hostname>/mcp` URL is **stable across restarts** — pin it in your agent once. Notes:
+
+- Set **both** env vars, or **neither**. A token without a hostname (or vice-versa) fails fast at startup.
+- `WINREACH_TUNNEL_TOKEN` is a **secret** (it encodes your account + tunnel id + secret). Store it like `WINREACH_TOKEN`; WinReach never writes it to logs.
+- The hostname → `127.0.0.1:7573` ingress mapping lives in **your** Cloudflare tunnel config, so WinReach passes no `--url` — it just runs `cloudflared tunnel run --token <token>` and reads the stable hostname from `WINREACH_TUNNEL_HOSTNAME` for display.
+- The same loopback / host-header rewrite / bearer-token notes as the quick tunnel apply.
 
 ## Connect Agents
 
@@ -337,7 +377,9 @@ WinReach reads `WINREACH_*` variables.
 | `WINREACH_CWD` | process cwd | Default working directory. |
 | `WINREACH_TIMEOUT_MS` | `30000` | Default command timeout. |
 | `WINREACH_MAX_OUTPUT_BYTES` | `1048576` | Max captured bytes per output stream. |
-| `WINREACH_TUNNEL` | empty | Set to `cloudflare` to publish the server through a Cloudflare quick tunnel. |
+| `WINREACH_TUNNEL` | empty | Set to `cloudflare` to publish the server through a Cloudflare quick tunnel (random, ephemeral hostname). |
+| `WINREACH_TUNNEL_TOKEN` | empty | **Secret.** Your own named Cloudflare tunnel's token. With `WINREACH_TUNNEL_HOSTNAME`, runs a named tunnel for a stable hostname (and enables the tunnel). Never logged. |
+| `WINREACH_TUNNEL_HOSTNAME` | empty | Stable public hostname your named tunnel resolves to (e.g. `winreach.example.com`). Required together with `WINREACH_TUNNEL_TOKEN`. |
 | `WINREACH_TUNNEL_AUTOINSTALL` | `1` | Auto-download `cloudflared` when missing. Set to `0` to require a preinstalled binary. |
 | `WINREACH_CLOUDFLARED_PATH` | auto | Explicit path to the `cloudflared` binary. |
 
@@ -404,11 +446,10 @@ See [SECURITY.md](SECURITY.md) for the full control matrix and what remains out 
 
 ## Roadmap
 
-Shipped: in-app HTTPS/mTLS, per-client authorization, command allow/deny policy, audit logging, and a Windows service installer (see [Hardening](#hardening)).
+Shipped: in-app HTTPS/mTLS, per-client authorization, command allow/deny policy, audit logging, a Windows service installer (see [Hardening](#hardening)), and named Cloudflare tunnels for stable hostnames (see [Stable Hostname With a Named Tunnel](#stable-hostname-with-a-named-tunnel)).
 
 Still planned:
 
-- Named Cloudflare tunnels for stable hostnames
 - Request-level Windows Integrated Authentication (Negotiate/NTLM)
 - Rate limiting and per-principal quotas
 - Git Bash support

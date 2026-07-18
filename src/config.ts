@@ -16,6 +16,16 @@ export type TunnelConfig = {
   provider: TunnelProvider;
   autoInstall: boolean;
   binaryPath?: string;
+  /**
+   * Remotely-managed named-tunnel token (`WINREACH_TUNNEL_TOKEN`). A secret,
+   * never logged. Its presence (together with `hostname`) selects named mode.
+   */
+  token?: string;
+  /**
+   * Stable public hostname for named mode (`WINREACH_TUNNEL_HOSTNAME`), e.g.
+   * `winreach.example.com`. Used to build the public/MCP URL.
+   */
+  hostname?: string;
 };
 
 /**
@@ -175,17 +185,34 @@ function readBoolEnv(name: string, fallback: boolean): boolean {
 
 function loadTunnelConfig(): TunnelConfig {
   const raw = readEnv("TUNNEL")?.trim().toLowerCase();
-  const enabled = raw !== undefined && raw !== "" && raw !== "off" && raw !== "false" && raw !== "none";
+  const explicitlyEnabled = raw !== undefined && raw !== "" && raw !== "off" && raw !== "false" && raw !== "none";
 
-  if (enabled && raw !== "cloudflare" && raw !== "on" && raw !== "true" && raw !== "1") {
+  if (explicitlyEnabled && raw !== "cloudflare" && raw !== "on" && raw !== "true" && raw !== "1") {
     throw new Error(`Unsupported WINREACH_TUNNEL value "${raw}". Use "cloudflare".`);
   }
 
+  // Named/persistent tunnel: the operator brings their own Cloudflare tunnel and
+  // supplies its token plus the stable hostname it resolves to. Mode is inferred
+  // from their presence — no separate WINREACH_TUNNEL_MODE flag. Both are
+  // required together (a token with no hostname, or vice-versa, is a misconfig).
+  const token = readEnv("TUNNEL_TOKEN")?.trim() || undefined;
+  const hostname = readEnv("TUNNEL_HOSTNAME")?.trim() || undefined;
+  if (Boolean(token) !== Boolean(hostname)) {
+    throw new Error(
+      "Named Cloudflare tunnel mode requires both WINREACH_TUNNEL_TOKEN and WINREACH_TUNNEL_HOSTNAME. " +
+        "Set both for a stable hostname, or neither to use a quick tunnel."
+    );
+  }
+  const named = Boolean(token) && Boolean(hostname);
+
   return {
-    enabled,
+    // Supplying named-tunnel credentials is itself an opt-in to run the tunnel.
+    enabled: explicitlyEnabled || named,
     provider: "cloudflare",
     autoInstall: readBoolEnv("TUNNEL_AUTOINSTALL", true),
-    binaryPath: readEnv("CLOUDFLARED_PATH")
+    binaryPath: readEnv("CLOUDFLARED_PATH"),
+    token,
+    hostname
   };
 }
 
