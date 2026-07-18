@@ -4,7 +4,7 @@ import { loadConfig, shortestTokenLength } from "./config.js";
 import { createWinReachApp } from "./mcpServer.js";
 import { sweepOldScreenshots } from "./powershell/screenshot.js";
 import { createServerForApp } from "./tls.js";
-import { startCloudflareTunnel, type TunnelHandle } from "./tunnel.js";
+import { startCloudflareTunnel, startNamedCloudflareTunnel, type TunnelHandle } from "./tunnel.js";
 
 function printConnectionHelp(mcpUrl: string): void {
   console.log("");
@@ -58,7 +58,12 @@ export async function main(): Promise<void> {
     }
     try {
       tunnel = await startTunnel(config);
-      console.log(`Cloudflare tunnel ready: ${tunnel.publicUrl}`);
+      const named = Boolean(config.tunnel.token && config.tunnel.hostname);
+      console.log(
+        named
+          ? `Named Cloudflare tunnel ready (stable hostname): ${tunnel.publicUrl}`
+          : `Cloudflare tunnel ready: ${tunnel.publicUrl}`
+      );
       console.log(`Public MCP endpoint: ${tunnel.mcpUrl}`);
       printConnectionHelp(tunnel.mcpUrl);
     } catch (error) {
@@ -85,13 +90,28 @@ export async function main(): Promise<void> {
 }
 
 function startTunnel(config: AppConfig): Promise<TunnelHandle> {
-  // cloudflared connects to WinReach over loopback, so the public tunnel needs
-  // no inbound firewall rule and no 0.0.0.0 bind.
+  const { tunnel, endpointPath, port } = config;
+
+  // Named mode: the operator supplied their own tunnel token + hostname. Ingress
+  // (hostname -> service) lives in Cloudflare, so no localUrl is passed.
+  if (tunnel.token && tunnel.hostname) {
+    return startNamedCloudflareTunnel({
+      token: tunnel.token,
+      hostname: tunnel.hostname,
+      endpointPath,
+      autoInstall: tunnel.autoInstall,
+      binaryPath: tunnel.binaryPath
+    });
+  }
+
+  // Quick mode (zero-config default). cloudflared connects to WinReach over
+  // loopback, so the public tunnel needs no inbound firewall rule and no
+  // 0.0.0.0 bind.
   return startCloudflareTunnel({
-    localUrl: `http://127.0.0.1:${config.port}`,
-    endpointPath: config.endpointPath,
-    autoInstall: config.tunnel.autoInstall,
-    binaryPath: config.tunnel.binaryPath
+    localUrl: `http://127.0.0.1:${port}`,
+    endpointPath,
+    autoInstall: tunnel.autoInstall,
+    binaryPath: tunnel.binaryPath
   });
 }
 

@@ -112,6 +112,58 @@ describe("loadConfig TLS", () => {
   });
 });
 
+describe("loadConfig tunnel", () => {
+  it("defaults to a disabled quick tunnel with no tunnel env vars", () => {
+    process.env.WINREACH_TOKEN = "t";
+    const { tunnel } = loadConfig();
+    expect(tunnel.enabled).toBe(false);
+    expect(tunnel.provider).toBe("cloudflare");
+    expect(tunnel.token).toBeUndefined();
+    expect(tunnel.hostname).toBeUndefined();
+    expect(tunnel.autoInstall).toBe(true);
+  });
+
+  it("enables a quick tunnel from WINREACH_TUNNEL=cloudflare (no named credentials)", () => {
+    process.env.WINREACH_TOKEN = "t";
+    process.env.WINREACH_TUNNEL = "cloudflare";
+    const { tunnel } = loadConfig();
+    expect(tunnel.enabled).toBe(true);
+    expect(tunnel.token).toBeUndefined();
+    expect(tunnel.hostname).toBeUndefined();
+  });
+
+  it("infers named mode from a token + hostname and enables the tunnel", () => {
+    process.env.WINREACH_TOKEN = "t";
+    process.env.WINREACH_TUNNEL_TOKEN = "cf-tunnel-token";
+    process.env.WINREACH_TUNNEL_HOSTNAME = "winreach.example.com";
+    const { tunnel } = loadConfig();
+    expect(tunnel.enabled).toBe(true);
+    expect(tunnel.token).toBe("cf-tunnel-token");
+    expect(tunnel.hostname).toBe("winreach.example.com");
+  });
+
+  it("throws when a token is supplied without a hostname", () => {
+    process.env.WINREACH_TOKEN = "t";
+    process.env.WINREACH_TUNNEL_TOKEN = "cf-tunnel-token";
+    expect(() => loadConfig()).toThrow(/WINREACH_TUNNEL_TOKEN and WINREACH_TUNNEL_HOSTNAME/);
+  });
+
+  it("throws when a hostname is supplied without a token", () => {
+    process.env.WINREACH_TOKEN = "t";
+    process.env.WINREACH_TUNNEL_HOSTNAME = "winreach.example.com";
+    expect(() => loadConfig()).toThrow(/WINREACH_TUNNEL_TOKEN and WINREACH_TUNNEL_HOSTNAME/);
+  });
+
+  it("reads an explicit cloudflared path and autoinstall toggle", () => {
+    process.env.WINREACH_TOKEN = "t";
+    process.env.WINREACH_CLOUDFLARED_PATH = "C:/tools/cloudflared.exe";
+    process.env.WINREACH_TUNNEL_AUTOINSTALL = "0";
+    const { tunnel } = loadConfig();
+    expect(tunnel.binaryPath).toBe("C:/tools/cloudflared.exe");
+    expect(tunnel.autoInstall).toBe(false);
+  });
+});
+
 describe("loadConfig audit + helpers", () => {
   it("reads the audit log path", () => {
     process.env.WINREACH_TOKEN = "t";
