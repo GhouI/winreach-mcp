@@ -22,6 +22,17 @@ export type Principal = {
    * those tools.
    */
   tools?: string[];
+  /**
+   * Per-principal override of the global per-minute request rate. `undefined`
+   * inherits the global default; an explicit `0` disables the per-minute limit
+   * for this principal even when a global default is set.
+   */
+  rateLimitPerMin?: number;
+  /**
+   * Per-principal override of the global daily call quota. `undefined` inherits
+   * the global default; an explicit `0` disables the quota for this principal.
+   */
+  dailyQuota?: number;
 };
 
 /** The shape accepted in the WINREACH_PRINCIPALS JSON array. */
@@ -34,6 +45,8 @@ type RawPrincipal = {
   allow?: unknown;
   deny?: unknown;
   tools?: unknown;
+  rateLimitPerMin?: unknown;
+  dailyQuota?: unknown;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -48,6 +61,21 @@ function asStringArray(value: unknown, path: string): string[] {
     throw new Error(`${path} must be an array of strings`);
   }
   return value as string[];
+}
+
+/**
+ * Parse an optional non-negative-integer field (a rate-limit knob). `undefined`
+ * stays `undefined` (inherit); a present value must be a whole number `>= 0`,
+ * where `0` is a meaningful "disabled" override.
+ */
+export function asOptionalNonNegInt(value: unknown, path: string): number | undefined {
+  if (value === undefined) {
+    return undefined;
+  }
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 0) {
+    throw new Error(`${path} must be a non-negative integer`);
+  }
+  return value;
 }
 
 /**
@@ -124,7 +152,19 @@ export function parsePrincipals(
     const tools =
       raw.tools !== undefined ? asStringArray(raw.tools, `${path}.tools`) : roleDef?.tools;
 
-    return { name, role, token, tokenHash, policy, tools };
+    // Rate-limit overrides follow the same inherit/override rule as `tools`: a
+    // value set on the principal wins; otherwise inherit the role's (which may
+    // itself be undefined = fall back to the global default).
+    const rateLimitPerMin =
+      raw.rateLimitPerMin !== undefined
+        ? asOptionalNonNegInt(raw.rateLimitPerMin, `${path}.rateLimitPerMin`)
+        : roleDef?.rateLimitPerMin;
+    const dailyQuota =
+      raw.dailyQuota !== undefined
+        ? asOptionalNonNegInt(raw.dailyQuota, `${path}.dailyQuota`)
+        : roleDef?.dailyQuota;
+
+    return { name, role, token, tokenHash, policy, tools, rateLimitPerMin, dailyQuota };
   });
 }
 

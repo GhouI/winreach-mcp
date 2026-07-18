@@ -1,4 +1,5 @@
 import { compilePatterns, type CommandPolicy } from "./policy.js";
+import { asOptionalNonNegInt } from "./principals.js";
 
 /**
  * A named role is a reusable permission template. A principal that references a
@@ -22,12 +23,18 @@ export type RoleDefinition = {
   policy: CommandPolicy;
   /** Tool allowlist inherited by referencing principals. `undefined` = every tool. */
   tools?: string[];
+  /** Per-minute rate limit inherited by referencing principals. `undefined` = global default. */
+  rateLimitPerMin?: number;
+  /** Daily call quota inherited by referencing principals. `undefined` = global default. */
+  dailyQuota?: number;
 };
 
 type RawRole = {
   allow?: unknown;
   deny?: unknown;
   tools?: unknown;
+  rateLimitPerMin?: unknown;
+  dailyQuota?: unknown;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -79,7 +86,9 @@ export function parseRoles(raw: string): Map<string, RoleDefinition> {
       deny: compilePatterns(asStringArray(role.deny, `${path}.deny`), `${path}.deny`)
     };
     const tools = role.tools === undefined ? undefined : asStringArray(role.tools, `${path}.tools`);
-    roles.set(name, { policy, tools });
+    const rateLimitPerMin = asOptionalNonNegInt(role.rateLimitPerMin, `${path}.rateLimitPerMin`);
+    const dailyQuota = asOptionalNonNegInt(role.dailyQuota, `${path}.dailyQuota`);
+    roles.set(name, { policy, tools, rateLimitPerMin, dailyQuota });
   }
   return roles;
 }

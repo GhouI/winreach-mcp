@@ -16,6 +16,8 @@ export type AuditEntry = {
   cwd?: string;
   sessionId?: string;
   reason?: string;
+  /** Rate limiting: seconds after which a throttled/quota-exceeded call may retry. */
+  retryAfter?: number;
   exitCode?: number | null;
   durationMs?: number;
   /** Captured image size in bytes, for take_screenshot. */

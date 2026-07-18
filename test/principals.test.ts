@@ -87,6 +87,32 @@ describe("parsePrincipals", () => {
       /tokenHash must be/
     );
   });
+
+  it("parses per-principal rate-limit overrides and leaves them undefined when omitted", () => {
+    const [withLimits] = parsePrincipals(
+      JSON.stringify([{ token: "t1", rateLimitPerMin: 20, dailyQuota: 1000 }]),
+      {}
+    );
+    expect(withLimits.rateLimitPerMin).toBe(20);
+    expect(withLimits.dailyQuota).toBe(1000);
+
+    const [none] = parsePrincipals(JSON.stringify([{ token: "t2" }]), {});
+    expect(none.rateLimitPerMin).toBeUndefined();
+    expect(none.dailyQuota).toBeUndefined();
+
+    // An explicit 0 is a real value (disable for this principal), not "inherit".
+    const [zero] = parsePrincipals(JSON.stringify([{ token: "t3", rateLimitPerMin: 0 }]), {});
+    expect(zero.rateLimitPerMin).toBe(0);
+  });
+
+  it("rejects a negative or non-integer rate-limit override", () => {
+    expect(() => parsePrincipals(JSON.stringify([{ token: "t", rateLimitPerMin: -1 }]), {})).toThrow(
+      /rateLimitPerMin must be a non-negative integer/
+    );
+    expect(() => parsePrincipals(JSON.stringify([{ token: "t", dailyQuota: 1.5 }]), {})).toThrow(
+      /dailyQuota must be a non-negative integer/
+    );
+  });
 });
 
 describe("resolvePrincipal", () => {

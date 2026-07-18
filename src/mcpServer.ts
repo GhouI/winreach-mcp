@@ -10,13 +10,42 @@ import { createAuditLogger, type AuditLogger } from "./audit.js";
 import type { Principal } from "./principals.js";
 import { PowerShellSessionManager } from "./powershell/session.js";
 import type { PowerShellResult } from "./powershell/types.js";
+import { RateLimiterStore } from "./rateLimit.js";
 import { registerTools, type ToolContext } from "./tools/index.js";
+import { checkRateLimit } from "./tools/helpers.js";
+
+/**
+ * Wrap `server.registerTool` so the per-principal rate limit is enforced ahead
+ * of every tool handler — current and future — from one place, rather than
+ * threading a guard through each child. A throttled call short-circuits with a
+ * clean error and never reaches the tool body (or its command policy).
+ */
+function installRateLimitGuard(server: McpServer, ctx: ToolContext): void {
+  const register = server.registerTool.bind(server) as (...args: unknown[]) => unknown;
+  (server as unknown as { registerTool: (...args: unknown[]) => unknown }).registerTool = (
+    ...args: unknown[]
+  ) => {
+    const name = args[0] as string;
+    const handler = args[args.length - 1];
+    if (typeof handler === "function") {
+      args[args.length - 1] = async (...callArgs: unknown[]) => {
+        const throttled = await checkRateLimit(ctx, name);
+        if (throttled) {
+          return throttled;
+        }
+        return (handler as (...a: unknown[]) => unknown)(...callArgs);
+      };
+    }
+    return register(...args);
+  };
+}
 
 export function createWinReachMcpServer(
   config: AppConfig,
   sessions: PowerShellSessionManager,
   principal: Principal,
-  audit: AuditLogger
+  audit: AuditLogger,
+  rateLimiter: RateLimiterStore = new RateLimiterStore()
 ): McpServer {
   const server = new McpServer({
     name: config.name,
@@ -38,7 +67,9 @@ export function createWinReachMcpServer(
   const allowsTool = (tool: string): boolean =>
     principal.tools === undefined || principal.tools.includes(tool);
 
-  const ctx: ToolContext = { config, sessions, principal, audit, allowsTool };
+  const ctx: ToolContext = { config, sessions, principal, audit, rateLimiter, allowsTool };
+  // Enforce the rate limit in front of every tool before the children register.
+  installRateLimitGuard(server, ctx);
   registerTools(server, ctx);
 
   return server;
@@ -84,6 +115,10 @@ function createMcpApp(config: AppConfig) {
 export function createWinReachApp(config: AppConfig) {
   const sessions = new PowerShellSessionManager(config);
   const audit = createAuditLogger(config.auditLogPath);
+  // One store for the whole process, so a principal's usage accumulates across
+  // the fresh McpServer built per request (which is why the limiter can't live
+  // inside that per-request server, as the computer_use bucket does today).
+  const rateLimiter = new RateLimiterStore();
   const app = createMcpApp(config);
 
   app.use(createOriginGuard(config.allowedOrigins));
@@ -106,7 +141,7 @@ export function createWinReachApp(config: AppConfig) {
       return;
     }
 
-    const server = createWinReachMcpServer(config, sessions, principal, audit);
+    const server = createWinReachMcpServer(config, sessions, principal, audit, rateLimiter);
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined
     });
@@ -155,7 +190,7 @@ export function createWinReachApp(config: AppConfig) {
     });
   });
 
-  return { app, sessions, audit };
+  return { app, sessions, audit, rateLimiter };
 }
 
 export function createCommandId(): string {

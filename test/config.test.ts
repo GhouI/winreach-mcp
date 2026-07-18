@@ -125,3 +125,23 @@ describe("loadConfig audit + helpers", () => {
     expect(shortestTokenLength(loadConfig().principals)).toBe(5);
   });
 });
+
+describe("loadConfig rate limiting", () => {
+  it("defaults both rate-limit dimensions to 0 (disabled)", () => {
+    process.env.WINREACH_TOKEN = "t";
+    expect(loadConfig().rateLimit).toEqual({ perMin: 0, dailyQuota: 0 });
+  });
+
+  it("reads the global per-minute and daily quota env vars", () => {
+    process.env.WINREACH_TOKEN = "t";
+    process.env.WINREACH_RATE_LIMIT_PER_MIN = "60";
+    process.env.WINREACH_RATE_LIMIT_DAILY_QUOTA = "5000";
+    expect(loadConfig().rateLimit).toEqual({ perMin: 60, dailyQuota: 5000 });
+  });
+
+  it("rejects a negative or non-integer rate-limit value", () => {
+    process.env.WINREACH_TOKEN = "t";
+    process.env.WINREACH_RATE_LIMIT_PER_MIN = "-1";
+    expect(() => loadConfig()).toThrow(/WINREACH_RATE_LIMIT_PER_MIN must be a non-negative integer/);
+  });
+});

@@ -70,6 +70,19 @@ export type FileTransferConfig = {
   maxBytes: number;
 };
 
+/**
+ * Global default rate limits applied to every principal (each overridable on the
+ * principal or its role). Both dimensions are opt-in: `0` disables that limit, so
+ * an unconfigured deployment behaves exactly as before. Enforcement is in-memory
+ * and per-process, keyed by principal — see `src/rateLimit.ts`.
+ */
+export type RateLimitConfig = {
+  /** Default requests per 60s window (token bucket). `0` = disabled. */
+  perMin: number;
+  /** Default calls per UTC calendar day (fixed window). `0` = no quota. */
+  dailyQuota: number;
+};
+
 export type AppConfig = {
   name: string;
   version: string;
@@ -78,6 +91,8 @@ export type AppConfig = {
   endpointPath: string;
   /** Authenticated identities. Always contains at least one principal. */
   principals: Principal[];
+  /** Global default per-principal rate limits (overridable per principal/role). */
+  rateLimit: RateLimitConfig;
   /** Deployment-wide command policy applied to every principal. */
   globalPolicy: CommandPolicy;
   /** Path to the JSONL audit log, or undefined to disable auditing. */
@@ -118,6 +133,23 @@ function readNumberEnv(name: string, fallback: number): number {
     throw new Error(`WINREACH_${name} must be a positive number`);
   }
 
+  return parsed;
+}
+
+/**
+ * Read a non-negative integer env var, where `0` (and unset) is a meaningful
+ * "disabled" value — used for the rate-limit knobs. Rejects negatives and
+ * non-integers so a typo fails loudly at startup.
+ */
+function readNonNegIntEnv(name: string, fallback: number): number {
+  const raw = readEnv(name)?.trim();
+  if (!raw) {
+    return fallback;
+  }
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw new Error(`WINREACH_${name} must be a non-negative integer`);
+  }
   return parsed;
 }
 
@@ -239,6 +271,17 @@ function loadFileTransferConfig(): FileTransferConfig {
   };
 }
 
+/**
+ * Global rate-limit defaults. Both are opt-in (`0`/unset = disabled), so an
+ * existing deployment sees no behavior change until an operator sets them.
+ */
+function loadRateLimitConfig(): RateLimitConfig {
+  return {
+    perMin: readNonNegIntEnv("RATE_LIMIT_PER_MIN", 0),
+    dailyQuota: readNonNegIntEnv("RATE_LIMIT_DAILY_QUOTA", 0)
+  };
+}
+
 function loadGlobalPolicy(): CommandPolicy {
   return {
     allow: compilePatterns(readPatternListEnv("COMMAND_ALLOWLIST"), "WINREACH_COMMAND_ALLOWLIST"),
@@ -310,6 +353,7 @@ export function loadConfig(): AppConfig {
     port: readNumberEnv("PORT", DEFAULT_PORT),
     endpointPath: readEnv("ENDPOINT_PATH") ?? "/mcp",
     principals: loadPrincipals(),
+    rateLimit: loadRateLimitConfig(),
     globalPolicy,
     auditLogPath: readEnv("AUDIT_LOG")?.trim() || undefined,
     tls: loadTlsConfig(),

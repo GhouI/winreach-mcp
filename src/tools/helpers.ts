@@ -3,6 +3,8 @@ import type { AuditLogger } from "../audit.js";
 import type { Principal } from "../principals.js";
 import type { PowerShellResult } from "../powershell/types.js";
 import { evaluatePolicies } from "../policy.js";
+import { effectiveRateLimits } from "../rateLimit.js";
+import type { ToolContext } from "./types.js";
 
 /**
  * Enforce the global + per-principal command policy before a command runs.
@@ -46,6 +48,48 @@ export async function enforcePolicy(
         type: "text" as const,
         text: JSON.stringify(
           { blocked: true, reason: decision.reason, matchedRule: decision.matchedRule },
+          null,
+          2
+        )
+      }
+    ]
+  };
+}
+
+/**
+ * Enforce the per-principal rate limit + daily quota before a tool runs. Runs at
+ * the very top of every tool call (ahead of the command policy), so a throttled
+ * call never reaches the underlying tool. Returns a structured throttle error
+ * (and audits it as `decision: "blocked"` with a distinguishing `reason` and a
+ * `retryAfter` hint) when the principal is over budget, or undefined to proceed.
+ *
+ * When neither a global nor a per-principal limit is configured the check is a
+ * no-op, so default deployments are unaffected.
+ */
+export async function checkRateLimit(ctx: ToolContext, tool: string) {
+  const { config, principal, audit, rateLimiter } = ctx;
+  const decision = rateLimiter.check(principal.name, effectiveRateLimits(config, principal));
+  if (decision.allowed) {
+    return undefined;
+  }
+
+  await audit.log({
+    time: new Date().toISOString(),
+    principal: principal.name,
+    role: principal.role,
+    tool,
+    decision: "blocked",
+    reason: decision.reason,
+    retryAfter: decision.retryAfter
+  });
+
+  return {
+    isError: true as const,
+    content: [
+      {
+        type: "text" as const,
+        text: JSON.stringify(
+          { blocked: true, reason: decision.reason, retryAfter: decision.retryAfter },
           null,
           2
         )

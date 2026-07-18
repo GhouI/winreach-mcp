@@ -98,3 +98,48 @@ describe("parsePrincipals with roles", () => {
     expect(p.policy.allow).toEqual([]);
   });
 });
+
+describe("role rate-limit inheritance", () => {
+  const roles = parseRoles(
+    JSON.stringify({
+      throttled: { rateLimitPerMin: 10, dailyQuota: 200 }
+    })
+  );
+
+  it("parses a role's rate-limit fields", () => {
+    expect(roles.get("throttled")?.rateLimitPerMin).toBe(10);
+    expect(roles.get("throttled")?.dailyQuota).toBe(200);
+  });
+
+  it("leaves role rate limits undefined when omitted", () => {
+    const plain = parseRoles(JSON.stringify({ plain: {} }));
+    expect(plain.get("plain")?.rateLimitPerMin).toBeUndefined();
+    expect(plain.get("plain")?.dailyQuota).toBeUndefined();
+  });
+
+  it("rejects a negative role rate limit", () => {
+    expect(() => parseRoles(JSON.stringify({ r: { dailyQuota: -5 } }))).toThrow(
+      /dailyQuota must be a non-negative integer/
+    );
+  });
+
+  it("inherits the role's rate limits when the principal omits them", () => {
+    const [p] = parsePrincipals(
+      JSON.stringify([{ name: "a", role: "throttled", token: "t-a" }]),
+      {},
+      roles
+    );
+    expect(p.rateLimitPerMin).toBe(10);
+    expect(p.dailyQuota).toBe(200);
+  });
+
+  it("lets the principal override the role's rate limit (including an explicit 0)", () => {
+    const [p] = parsePrincipals(
+      JSON.stringify([{ name: "b", role: "throttled", token: "t-b", rateLimitPerMin: 0 }]),
+      {},
+      roles
+    );
+    expect(p.rateLimitPerMin).toBe(0); // overridden (disabled), not inherited
+    expect(p.dailyQuota).toBe(200); // still inherited
+  });
+});

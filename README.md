@@ -306,10 +306,12 @@ WinReach reads `WINREACH_*` variables.
 | Variable | Default | Description |
 | --- | --- | --- |
 | `WINREACH_TOKEN` | required* | Bearer token for a single full-access admin. *Required unless `WINREACH_PRINCIPALS` is set. |
-| `WINREACH_PRINCIPALS` | empty | JSON array of per-user principals: `[{"name","role","token"\|"tokenEnv"\|"tokenHash","allow":[],"deny":[],"tools":[]}]`. Enables per-user authorization. A key may be plaintext (`token`/`tokenEnv`) or a SHA-256 hex `tokenHash` (a presented token authenticates when its SHA-256 matches — so an external store never needs the plaintext). `tools` optionally limits a principal to specific tool names (omit for all). |
+| `WINREACH_PRINCIPALS` | empty | JSON array of per-user principals: `[{"name","role","token"\|"tokenEnv"\|"tokenHash","allow":[],"deny":[],"tools":[],"rateLimitPerMin":0,"dailyQuota":0}]`. Enables per-user authorization. A key may be plaintext (`token`/`tokenEnv`) or a SHA-256 hex `tokenHash` (a presented token authenticates when its SHA-256 matches — so an external store never needs the plaintext). `tools` optionally limits a principal to specific tool names (omit for all). `rateLimitPerMin`/`dailyQuota` optionally override the global rate limits for this principal (`0` disables that limit for it; omit to inherit). |
 | `WINREACH_COMMAND_ALLOWLIST` | empty | Regex allowlist (comma-separated or JSON array). If non-empty, only matching commands run. |
 | `WINREACH_COMMAND_DENYLIST` | empty | Regex denylist (comma-separated or JSON array). Matching commands are blocked; deny wins over allow. |
 | `WINREACH_AUDIT_LOG` | empty | Path to an append-only JSONL audit log of every tool call. |
+| `WINREACH_RATE_LIMIT_PER_MIN` | `0` | Global per-principal cap on tool calls per 60s (token bucket). `0` disables it. Overridable per principal/role via `rateLimitPerMin`. Throttled calls return a `retryAfter` hint and are audited as `blocked`. |
+| `WINREACH_RATE_LIMIT_DAILY_QUOTA` | `0` | Global per-principal cap on tool calls per UTC calendar day (resets at 00:00 UTC). `0` disables it. Overridable per principal/role via `dailyQuota`. |
 | `WINREACH_TLS_CERT` | empty | PEM certificate path. Set with `WINREACH_TLS_KEY` to serve HTTPS in-app. |
 | `WINREACH_TLS_KEY` | empty | PEM private key path for TLS. |
 | `WINREACH_TLS_KEY_PASSPHRASE` | empty | Passphrase for an encrypted TLS key. |
@@ -391,6 +393,16 @@ $env:WINREACH_AUDIT_LOG = "C:\logs\winreach-audit.jsonl"
 
 The global policy plus the caller's principal policy must both allow a command; deny always wins, and a non-empty allowlist blocks anything it does not match. Blocked calls return an MCP error and are written to the audit log.
 
+**Bound a runaway or abusive agent with rate limits and daily quotas:**
+
+```powershell
+# Global defaults for every principal (opt-in; 0/unset disables).
+$env:WINREACH_RATE_LIMIT_PER_MIN = "60"       # token bucket: 60 tool calls / 60s
+$env:WINREACH_RATE_LIMIT_DAILY_QUOTA = "5000"  # fixed window: resets at 00:00 UTC
+```
+
+The limit applies to **every** tool call, per principal, and a principal (or its role) can override either dimension with `rateLimitPerMin` / `dailyQuota` (`0` opts that principal out). A throttled call never runs the underlying tool: it returns `{ "blocked": true, "reason": "rate limited" | "quota exceeded", "retryAfter": <seconds> }` and is audited as `blocked`. Limits are in-memory and per-process (like the `computer_use` cap), so front WinReach with a proxy to bound usage across multiple instances.
+
 **Install as a Windows service under a dedicated account:**
 
 ```powershell
@@ -404,13 +416,12 @@ See [SECURITY.md](SECURITY.md) for the full control matrix and what remains out 
 
 ## Roadmap
 
-Shipped: in-app HTTPS/mTLS, per-client authorization, command allow/deny policy, audit logging, and a Windows service installer (see [Hardening](#hardening)).
+Shipped: in-app HTTPS/mTLS, per-client authorization, command allow/deny policy, audit logging, per-principal rate limiting + daily quotas, and a Windows service installer (see [Hardening](#hardening)).
 
 Still planned:
 
 - Named Cloudflare tunnels for stable hostnames
 - Request-level Windows Integrated Authentication (Negotiate/NTLM)
-- Rate limiting and per-principal quotas
 - Git Bash support
 - Packaged releases
 
